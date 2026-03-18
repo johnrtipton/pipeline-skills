@@ -135,7 +135,12 @@ Add `.pipeline-state/` to `.gitignore` — state files should not be committed.
 
 ## Quality Gate Protocol
 
-Every stage MUST follow this protocol when it completes. This runs after EVERY stage — it is the heartbeat of the pipeline.
+This protocol runs at the **start** and **end** of EVERY stage — it is the heartbeat of the pipeline.
+
+### Before starting each stage:
+
+1. **Check state file exists**: If `.pipeline-state/<branch-name>.json` does NOT exist, create it now from the appropriate template (feature/bugfix/refactor). Fill in task_description, branch_name, pr_target_branch, project_path, started_at. This is a safety net — Step 0 should have created it, but if it was lost to context compression, this catches it.
+2. **Read current stage from state file**: Verify this stage hasn't already been completed (status = `passed`). If it has, skip to the next incomplete stage.
 
 ### After completing each stage:
 
