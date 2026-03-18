@@ -15,6 +15,77 @@ These procedures are referenced by name from the pipeline-feature, pipeline-bugf
 
 ---
 
+## Pipeline State File (Resume Support)
+
+Pipelines write progress to `.pipeline-state/<branch-name>.json` in the project root. This enables resuming after interruptions (context limit, crash, user stop).
+
+### State File Format
+
+```json
+{
+  "pipeline_type": "feature",
+  "task_description": "Add health check endpoint",
+  "branch_name": "feat/add-health-check",
+  "pr_target_branch": "main",
+  "project_path": "/path/to/project",
+  "started_at": "2026-03-18T14:30:00Z",
+  "current_stage": 6,
+  "stages": {
+    "1": {"name": "Environment Check", "status": "passed", "verdict": "ENV_OK"},
+    "2": {"name": "Change Detection", "status": "passed", "verdict": "CODE_CHANGES"},
+    "3": {"name": "Conflict Check", "status": "passed", "verdict": "MERGE_CLEAN"},
+    "4": {"name": "Planning", "status": "passed"},
+    "5": {"name": "Implementation", "status": "passed"},
+    "6": {"name": "Test Execution", "status": "running"}
+  },
+  "pr_number": null,
+  "pr_url": null,
+  "rewind_count": 0
+}
+```
+
+### Writing State
+
+After each stage completes (pass or fail), update the state file:
+```bash
+mkdir -p .pipeline-state
+# Write updated JSON to .pipeline-state/<branch-name>.json
+```
+
+Update the `current_stage`, mark the completed stage's status as `passed` or `failed`, record the verdict string, and save any extracted data (PR number, PR URL).
+
+### Reading State (Resume)
+
+At pipeline start, before Stage 1:
+1. Check for `.pipeline-state/<branch-name>.json`
+2. If found, read it and determine the last completed stage
+3. Skip all completed stages — jump directly to the first incomplete stage
+4. Print a resume summary:
+   ```
+   Resuming pipeline from Stage 6 (Test Execution)
+   Stages 1-5 completed previously. Branch: feat/add-health-check
+   ```
+5. If the branch already exists with commits, `git checkout <branch>` instead of creating fresh
+
+### Resume Rules
+
+- **Passed stages**: Skip entirely — their work is already done
+- **Failed stages**: Re-run from the failed stage (not from the beginning)
+- **Running stages**: Treat as not started — re-run them
+- **Rewind state**: If `rewind_count > 0`, resume at the rewind target stage
+- **PR already created**: Skip Commit & PR, jump to Code Review
+
+### Cleanup
+
+When the pipeline completes (all stages passed) or is abandoned:
+```bash
+rm .pipeline-state/<branch-name>.json
+```
+
+Add `.pipeline-state/` to `.gitignore` — state files should not be committed.
+
+---
+
 ## Quality Gate Protocol
 
 Every stage MUST output its verdict string on its own line. Follow these rules:

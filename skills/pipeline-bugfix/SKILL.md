@@ -21,6 +21,8 @@ Run a complete bug fix cycle with diagnosis, targeted fix, regression checking, 
 1. Follow the **Configuration Gathering** procedure from pipeline-shared to identify project config
 2. Generate a branch name from the bug report: `fix/<short-slug>` (e.g., `fix/login-timeout`)
 3. Note the project's pr_target_branch (default: `main`)
+4. **Check for resume state**: Follow the **Pipeline State File** procedure from pipeline-shared. If `.pipeline-state/<branch-name>.json` exists, resume from the last incomplete stage — skip all passed stages and print a resume summary
+5. **Write state after every stage**: Update `.pipeline-state/<branch-name>.json` after each stage completes (pass or fail). This enables resuming if the session is interrupted.
 
 ---
 
