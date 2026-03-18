@@ -371,6 +371,53 @@ Flag as critical if any of these are found:
 
 For each finding, include: file and line number, severity (critical/warning/suggestion), description, suggested fix.
 
+### Post Review to GitHub PR
+
+If a PR number is available, post the review as a GitHub PR review:
+
+**For inline comments on specific files/lines**, use:
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+  --method POST \
+  -f body='## Automated Code Review\n\n<summary>' \
+  -f event='COMMENT' \
+  -f 'comments[][path]=<file>' \
+  -f 'comments[][line]=<line>' \
+  -f 'comments[][body]=<finding>'
+```
+
+**For a general review comment** (simpler, always works):
+```bash
+gh pr review <pr_number> --comment --body "$(cat <<'REVIEW'
+## Automated Code Review
+
+### Summary
+<one paragraph summary>
+
+### Findings
+<categorized findings with file:line references>
+
+### Checklist
+- [x] Tests pass
+- [x] No auto-reject triggers
+- [ ] CHANGELOG updated (if applicable)
+...
+
+### Verdict
+APPROVE / REQUEST_CHANGES / COMMENT
+REVIEW
+)"
+```
+
+**Choose the approach based on findings:**
+- If you have specific line-level findings → use the inline comments API for the most useful ones, plus a summary review
+- If findings are general → use the simple review comment
+- Always include a checklist summary showing what was checked
+
+### Save Review Locally
+
+Also save the review to `pr/feedback/pr-<number>-<short-description>.md` if the project has a `pr/feedback/` directory (per the djust PR checklist convention).
+
 ### Gate
 - Output `REVIEW_COMPLETE` — this stage always passes (informational)
 - Critical findings will be evaluated in the Review Verdict stage
@@ -427,6 +474,13 @@ APPROVE / REQUEST_CHANGES / COMMENT
 ```
 
 Output exactly one of: `APPROVE`, `REQUEST_CHANGES`, or `COMMENT` on its own line as the final verdict.
+
+### Post Verdict to GitHub PR
+
+Submit the verdict as a formal GitHub PR review:
+- If `APPROVE`: `gh pr review <pr_number> --approve --body '<verdict summary>'`
+- If `REQUEST_CHANGES`: `gh pr review <pr_number> --request-changes --body '<verdict with critical issues>'`
+- If `COMMENT`: `gh pr review <pr_number> --comment --body '<verdict with suggestions>'`
 
 If `REQUEST_CHANGES`: fix the issues, then re-evaluate. Only proceed to Merge PR when verdict is `APPROVE`.
 

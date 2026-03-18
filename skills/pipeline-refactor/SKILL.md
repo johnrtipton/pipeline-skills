@@ -156,13 +156,20 @@ Gate: `PR_CREATED`, `PR_EXISTS`, or `PR_SKIPPED`.
 
 Use the **Agent tool** to spawn a subagent with this prompt:
 
-> You are reviewing a pull request for a refactor. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
+> You are reviewing PR #`<pr_number>` for a refactor. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
 >
-> **Step 1 — Code Review**: Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework. Review for: behavior preservation (refactor must not change functionality), correctness, security, testing gaps, code quality, documentation. Flag auto-reject triggers.
+> **Step 1 — Code Review**:
+> 1. Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context.
+> 2. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework.
+> 3. Review for: behavior preservation (refactor MUST NOT change functionality), correctness, security, testing gaps, code quality, documentation. Flag auto-reject triggers.
+> 4. **Post the review to GitHub**: `gh pr review <pr_number> --comment --body '<formatted review with checklist and findings>'`
+> 5. If the project has a `pr/feedback/` directory, save to `pr/feedback/pr-<number>-<short-slug>.md`.
 >
 > **Step 2 — Test Verification**: Run the project test suite. Report pass/fail.
 >
-> **Step 3 — Review Verdict**: Synthesize findings. Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
+> **Step 3 — Review Verdict**: Synthesize findings.
+> - If auto-reject triggers OR tests failed → `gh pr review <pr_number> --request-changes --body '<issues>'` and output REQUEST_CHANGES.
+> - Otherwise → output APPROVE.
 
 - If `APPROVE` → proceed to Stage 12
 - If `REQUEST_CHANGES` → fix issues, re-commit, re-push, re-run subagent. Second failure → **STOP PIPELINE**.
@@ -172,7 +179,7 @@ Use the **Agent tool** to spawn a subagent with this prompt:
 Use the **Agent tool** to spawn a subagent:
 
 > Approve and merge PR #`<pr_number>` in `<project_path>`.
-> 1. `gh pr review <pr_number> --approve --body 'Auto-approved: tests pass, review complete.'`
+> 1. `gh pr review <pr_number> --approve --body 'Automated review passed: tests pass, no auto-reject triggers, checklist clean.'`
 > 2. `gh pr merge <pr_number> --squash --delete-branch`
 > 3. Output PR_MERGED or MERGE_FAILED.
 

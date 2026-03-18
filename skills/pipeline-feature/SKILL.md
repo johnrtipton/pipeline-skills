@@ -205,13 +205,24 @@ Gate: `PR_CREATED`, `PR_EXISTS`, or `PR_SKIPPED`.
 
 Use the **Agent tool** to spawn a subagent with this prompt:
 
-> You are reviewing a pull request. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
+> You are reviewing PR #`<pr_number>` on GitHub. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
 >
-> **Step 1 — Code Review**: Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework. Review for: correctness, security (mark_safe, |safe, csrf_exempt, XSS, injection), testing gaps, code quality (print vs logging, f-string in loggers, silent exceptions, console.log without debug guards), documentation (CHANGELOG updated for feat/fix), performance (N+1 queries), architecture. Flag auto-reject triggers: print() instead of logging, f-string in loggers, unguarded console.log, except:pass, no tests for new code, tests referencing phantom modules, mark_safe with unescaped interpolation, placeholder/stub code.
+> **Step 1 — Code Review**:
+> 1. Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context.
+> 2. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework.
+> 3. Review for: correctness, security (mark_safe, |safe, csrf_exempt, XSS, injection), testing gaps, code quality (print vs logging, f-string in loggers, silent exceptions, console.log without debug guards), documentation (CHANGELOG updated for feat/fix), performance (N+1 queries), architecture.
+> 4. Flag auto-reject triggers: print() instead of logging, f-string in loggers, unguarded console.log, except:pass, no tests for new code, tests referencing phantom modules, mark_safe with unescaped interpolation, placeholder/stub code.
+> 5. **Post the review to GitHub** as a PR review comment:
+>    `gh pr review <pr_number> --comment --body '<formatted review with checklist, findings, and verdict>'`
+>    Include a checklist summary of what was checked and pass/fail status.
+> 6. If the project has a `pr/feedback/` directory, also save the review to `pr/feedback/pr-<number>-<short-slug>.md`.
 >
 > **Step 2 — Test Verification**: Run the project test suite. Report pass/fail. If tests fail, output TESTS_FAILED.
 >
-> **Step 3 — Review Verdict**: Synthesize findings. If any auto-reject triggers found OR tests failed → output REQUEST_CHANGES with the list. Otherwise → output APPROVE. Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
+> **Step 3 — Review Verdict**: Synthesize findings.
+> - If any auto-reject triggers found OR tests failed → post `gh pr review <pr_number> --request-changes --body '<issues>'` and output REQUEST_CHANGES.
+> - Otherwise → output APPROVE.
+> Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
 
 Collect the subagent's output.
 
@@ -224,7 +235,7 @@ Collect the subagent's output.
 Use the **Agent tool** to spawn a subagent with this prompt:
 
 > Approve and merge PR #`<pr_number>` in `<project_path>`.
-> 1. Run: `gh pr review <pr_number> --approve --body 'Auto-approved: tests pass, review complete.'`
+> 1. Run: `gh pr review <pr_number> --approve --body 'Automated review passed: tests pass, no auto-reject triggers, checklist clean.'`
 > 2. Run: `gh pr merge <pr_number> --squash --delete-branch`
 > 3. If merge succeeds, output: PR_MERGED
 > 4. If merge fails, output: MERGE_FAILED followed by error details.
