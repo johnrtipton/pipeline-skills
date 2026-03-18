@@ -50,6 +50,7 @@
       "verdict": null,
       "checklist": [
         {"action": "read .pipeline-state/<branch>-diagnosis.md for the diagnosis and proposed fix", "done": false, "mandatory": true},
+        {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml)", "done": false, "mandatory": true},
         {"action": "implement minimal focused fix", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
         {"action": "dual-path wiring: if fix touches lifecycle/mount/events, verify BOTH websocket.py AND mixins/request.py are patched", "done": false},

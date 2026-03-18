@@ -59,6 +59,7 @@
       "verdict": null,
       "checklist": [
         {"action": "read .pipeline-state/<branch>-plan.md for the implementation plan", "done": false, "mandatory": true},
+        {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml [tool.pytest.ini_options] testpaths)", "done": false, "mandatory": true},
         {"action": "write tests first (TDD)", "done": false},
         {"action": "implement to pass tests", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
