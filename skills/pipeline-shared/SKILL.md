@@ -15,6 +15,25 @@ These procedures are referenced by name from the pipeline-feature, pipeline-bugf
 
 ---
 
+## Step 0: Initialize State File (FIRST THING)
+
+**This is the very first action in any pipeline — before Environment Check, before anything else.**
+
+1. `mkdir -p .pipeline-state`
+2. Copy the appropriate template from the pipeline-skill repo's `templates/` directory:
+   - Feature: `templates/feature-state.json`
+   - Bugfix: `templates/bugfix-state.json`
+   - Refactor: `templates/refactor-state.json`
+3. Fill in: `task_description`, `branch_name`, `pr_target_branch`, `project_path`, `started_at` (ISO 8601)
+4. Write to `.pipeline-state/<branch-name>.json`
+5. Ensure `.pipeline-state/` is in `.gitignore`
+
+**If a state file already exists** for this branch, this is a resume — read it, find the first stage that isn't `passed`, and skip to that stage.
+
+This must happen first so that if the pipeline is interrupted at ANY point — even during stage 1 — the state file exists and resume is possible.
+
+---
+
 ## Pipeline State File (Resume Support)
 
 Pipelines write progress to `.pipeline-state/<branch-name>.json` in the project root. This enables resuming after interruptions (context limit, crash, user stop).

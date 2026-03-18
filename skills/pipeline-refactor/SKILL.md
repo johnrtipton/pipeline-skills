@@ -19,11 +19,10 @@ Run a complete refactoring cycle with analysis, behavior-preserving execution, r
 
 ## Before You Start
 
-1. Follow the **Configuration Gathering** procedure from pipeline-shared to identify project config
-2. Generate a branch name from the task: `refactor/<short-slug>` (e.g., `refactor/split-views-module`)
-3. Note the project's pr_target_branch (default: `main`)
-4. **Check for resume state**: Follow the **Pipeline State File** procedure from pipeline-shared. If `.pipeline-state/<branch-name>.json` exists, resume from the last incomplete stage — skip all passed stages and print a resume summary
-5. **Write state after every stage**: Update `.pipeline-state/<branch-name>.json` after each stage completes (pass or fail). This enables resuming if the session is interrupted.
+1. Generate a branch name from the task: `refactor/<short-slug>` (e.g., `refactor/split-views-module`)
+2. **Initialize state file (Step 0)**: Follow the **Step 0: Initialize State File** procedure from pipeline-shared. This is the FIRST action — creates `.pipeline-state/<branch-name>.json` from `templates/refactor-state.json`. If it already exists, this is a resume.
+3. Follow the **Configuration Gathering** procedure from pipeline-shared to identify project config
+4. Note the project's pr_target_branch (default: `main`)
 
 ---
 
