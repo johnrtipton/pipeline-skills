@@ -190,11 +190,14 @@ Use the **Agent tool** to spawn a subagent:
 
 Use the **Agent tool** to spawn a subagent:
 
-> Review the pipeline execution for the refactor: `<task description>`. Project: `<project_path>`. PR #`<pr_number>`.
-> Run `git log --oneline <pr_target_branch>..HEAD`.
-> 1. Rate quality (1-5), what went well, lessons learned, what could improve.
-> 2. Output IDEA: and TOOL: lines.
-> 3. **Persist**: Append to `.pipeline-log.md` (create if needed, add to .gitignore). Post retro summary as `gh pr comment <pr_number> --body '<formatted retro>'`.
+> You are writing a retrospective for a completed refactor pipeline. Task: `<task description>`. Project: `<project_path>`. PR #`<pr_number>`.
+> Run `git log --oneline <pr_target_branch>..HEAD`. Evaluate: quality (1-5), what went well, lessons learned, improvements, IDEA:/TOOL: lines.
+>
+> **You MUST post the retrospective to these two places. This is not optional.**
+> 1. `gh pr comment <pr_number> --body "## Pipeline Retrospective\n\n**Quality**: X/5\n\n### What Went Well\n- ...\n\n### Lessons Learned\n- ...\n\n### Suggested Improvements\n- IDEA: ..."`
+> 2. Append to `.pipeline-log.md` (create if needed, ensure in .gitignore).
+>
+> Output RETRO_COMPLETE when both posts are done.
 
 **The pipeline is now complete.**
 

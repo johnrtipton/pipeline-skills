@@ -1,0 +1,28 @@
+{
+  "pipeline_type": "bugfix",
+  "task_description": "",
+  "branch_name": "",
+  "pr_target_branch": "main",
+  "project_path": "",
+  "started_at": "",
+  "completed_at": null,
+  "current_stage": 1,
+  "stages": {
+    "1":  {"name": "Environment Check",  "status": "pending", "verdict": null, "checklist": ["git fetch origin", "checkout fresh branch from target", "verify python/venv", "install dependencies", "smoke test imports", "output ENV_OK or ENV_FAILED"]},
+    "2":  {"name": "Conflict Check",     "status": "pending", "verdict": null, "checklist": ["git diff --check", "grep for conflict markers", "output MERGE_CLEAN or MERGE_CONFLICTS_FOUND"]},
+    "3":  {"name": "Diagnosis",          "status": "pending", "verdict": null, "checklist": ["read bug report", "search codebase for relevant code", "identify root cause (not symptom)", "propose fix", "scope check — output SCOPE_EXPANDED if broader than spec"]},
+    "4":  {"name": "Fix",                "status": "pending", "verdict": null, "checklist": ["implement minimal focused fix", "edge case checklist (null/empty/boundary/concurrent)", "git add -u + new files", "git status clean"]},
+    "5":  {"name": "Test Execution",     "status": "pending", "verdict": null, "checklist": ["run full test suite (read-only)", "report pass/fail counts", "output TESTS_PASSED or TESTS_FAILED"]},
+    "6":  {"name": "Regression Check",   "status": "pending", "verdict": null, "checklist": ["verify root cause addressed (not just symptom)", "cross-ref diagnosis vs fix", "check no related functionality broken", "edge cases handled", "output REGRESSION_PASSED or REGRESSION_FAILED"]},
+    "7":  {"name": "Documentation",      "status": "pending", "verdict": null, "checklist": ["update docstrings/README/comments", "output DOCS_UPDATED"]},
+    "8":  {"name": "Commit & PR",        "status": "pending", "verdict": null, "checklist": ["git remote -v (check for github)", "checkout/create branch", "commit with fix: prefix", "git push -u origin", "gh pr create", "output PR_CREATED/PR_EXISTS/PR_SKIPPED"]},
+    "9":  {"name": "Code Review",        "status": "pending", "verdict": null, "checklist": ["[subagent] git diff against target", "load project PR checklist if exists", "verify regression test exists", "check auto-reject triggers", "MANDATORY: gh pr review --comment with formatted review", "save to pr/feedback/ if dir exists"]},
+    "10": {"name": "Test Verification",  "status": "pending", "verdict": null, "checklist": ["[subagent] run full test suite", "report pass/fail"]},
+    "11": {"name": "Review Verdict",     "status": "pending", "verdict": null, "checklist": ["[subagent] synthesize findings", "MANDATORY: post verdict to GitHub", "output APPROVE/REQUEST_CHANGES/COMMENT"]},
+    "12": {"name": "Merge PR",           "status": "pending", "verdict": null, "checklist": ["[subagent] gh pr merge --squash --delete-branch", "do NOT self-approve", "output PR_MERGED or MERGE_FAILED"]},
+    "13": {"name": "Retrospective",      "status": "pending", "verdict": null, "checklist": ["[subagent] rate quality 1-5", "what went well", "lessons learned", "IDEA: lines", "MANDATORY: gh pr comment with retro", "MANDATORY: append to .pipeline-log.md", "output RETRO_COMPLETE"]}
+  },
+  "pr_number": null,
+  "pr_url": null,
+  "rewind_count": 0
+}

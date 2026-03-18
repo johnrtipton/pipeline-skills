@@ -148,18 +148,17 @@ Use the **Agent tool** to spawn a subagent with this prompt:
 
 > You are reviewing PR #`<pr_number>` for a bug fix. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
 >
-> **Step 1 — Code Review**:
-> 1. Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context.
-> 2. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework.
-> 3. Review for: correctness, security, testing gaps (bug fix MUST have regression test), code quality, documentation (CHANGELOG updated for fix), performance. Flag auto-reject triggers.
-> 4. **Post the review to GitHub**: `gh pr review <pr_number> --comment --body '<formatted review with checklist and findings>'`
-> 5. If the project has a `pr/feedback/` directory, save to `pr/feedback/pr-<number>-<short-slug>.md`.
+> **Step 1 — Code Review**: Run `git diff <pr_target_branch>...HEAD`. Read changed files. Check for `docs/PULL_REQUEST_CHECKLIST.md` and use it if found. Review for: correctness, security, testing gaps (bug fix MUST have regression test), code quality, documentation (CHANGELOG updated for fix), performance. Flag auto-reject triggers.
 >
 > **Step 2 — Test Verification**: Run the project test suite. Report pass/fail.
 >
-> **Step 3 — Review Verdict**: Synthesize findings.
-> - If auto-reject triggers OR tests failed → `gh pr review <pr_number> --request-changes --body '<issues>'` and output REQUEST_CHANGES.
-> - Otherwise → output APPROVE.
+> **Step 3 — Review Verdict**: Synthesize findings. Decide: APPROVE, REQUEST_CHANGES, or COMMENT.
+>
+> **Step 4 — MANDATORY: Post review to GitHub PR**. Run:
+> `gh pr review <pr_number> --comment --body "<formatted review with checklist, findings, and verdict>"`
+> If REQUEST_CHANGES, use `--request-changes` instead. If project has `pr/feedback/`, save there too.
+>
+> **Step 5** — Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
 
 - If `APPROVE` → proceed to Stage 12
 - If `REQUEST_CHANGES` → fix issues, re-commit, re-push, re-run subagent. Second failure → **STOP PIPELINE**.
@@ -180,11 +179,14 @@ Use the **Agent tool** to spawn a subagent:
 
 Use the **Agent tool** to spawn a subagent:
 
-> Review the pipeline execution for the bug fix: `<task description>`. Project: `<project_path>`. PR #`<pr_number>`.
-> Run `git log --oneline <pr_target_branch>..HEAD`.
-> 1. Rate quality (1-5), what went well, lessons learned, what could improve.
-> 2. Output IDEA: and TOOL: lines.
-> 3. **Persist**: Append to `.pipeline-log.md` (create if needed, add to .gitignore). Post retro summary as `gh pr comment <pr_number> --body '<formatted retro>'`.
+> You are writing a retrospective for a completed bug fix pipeline. Task: `<task description>`. Project: `<project_path>`. PR #`<pr_number>`.
+> Run `git log --oneline <pr_target_branch>..HEAD`. Evaluate: quality (1-5), what went well, lessons learned, improvements, IDEA:/TOOL: lines.
+>
+> **You MUST post the retrospective to these two places. This is not optional.**
+> 1. `gh pr comment <pr_number> --body "## Pipeline Retrospective\n\n**Quality**: X/5\n\n### What Went Well\n- ...\n\n### Lessons Learned\n- ...\n\n### Suggested Improvements\n- IDEA: ..."`
+> 2. Append to `.pipeline-log.md` (create if needed, ensure in .gitignore).
+>
+> Output RETRO_COMPLETE when both posts are done.
 
 **The pipeline is now complete.**
 

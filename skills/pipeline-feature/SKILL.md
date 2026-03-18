@@ -212,17 +212,28 @@ Use the **Agent tool** to spawn a subagent with this prompt:
 > 2. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework.
 > 3. Review for: correctness, security (mark_safe, |safe, csrf_exempt, XSS, injection), testing gaps, code quality (print vs logging, f-string in loggers, silent exceptions, console.log without debug guards), documentation (CHANGELOG updated for feat/fix), performance (N+1 queries), architecture.
 > 4. Flag auto-reject triggers: print() instead of logging, f-string in loggers, unguarded console.log, except:pass, no tests for new code, tests referencing phantom modules, mark_safe with unescaped interpolation, placeholder/stub code.
-> 5. **Post the review to GitHub** as a PR review comment:
->    `gh pr review <pr_number> --comment --body '<formatted review with checklist, findings, and verdict>'`
->    Include a checklist summary of what was checked and pass/fail status.
-> 6. If the project has a `pr/feedback/` directory, also save the review to `pr/feedback/pr-<number>-<short-slug>.md`.
 >
 > **Step 2 — Test Verification**: Run the project test suite. Report pass/fail. If tests fail, output TESTS_FAILED.
 >
-> **Step 3 — Review Verdict**: Synthesize findings.
-> - If any auto-reject triggers found OR tests failed → post `gh pr review <pr_number> --request-changes --body '<issues>'` and output REQUEST_CHANGES.
-> - Otherwise → output APPROVE.
-> Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
+> **Step 3 — Review Verdict**: Synthesize findings. Decide: APPROVE, REQUEST_CHANGES, or COMMENT.
+>
+> **Step 4 — MANDATORY: Post review to GitHub PR**. You MUST do this before outputting your verdict. Run:
+> ```
+> gh pr review <pr_number> --comment --body "## Automated Code Review
+>
+> ### Checklist
+> - [x/fail] item...
+>
+> ### Findings
+> ...categorized findings...
+>
+> ### Verdict
+> APPROVE / REQUEST_CHANGES / COMMENT"
+> ```
+> If the project has a `pr/feedback/` directory, also save to `pr/feedback/pr-<number>-<slug>.md`.
+> If verdict is REQUEST_CHANGES, use `gh pr review <pr_number> --request-changes` instead of `--comment`.
+>
+> **Step 5** — Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
 
 Collect the subagent's output.
 
@@ -249,17 +260,36 @@ Collect the subagent's output.
 
 Use the **Agent tool** to spawn a subagent with this prompt:
 
-> Review the pipeline execution for the task: `<task description>`. The project is at `<project_path>`. PR #`<pr_number>`.
+> You are writing a retrospective for a completed pipeline. Task: `<task description>`. Project: `<project_path>`. PR #`<pr_number>`.
+>
 > Run `git log --oneline <pr_target_branch>..HEAD` to see what was done.
-> 1. Rate execution quality (1-5)
-> 2. What went well?
-> 3. What could improve?
-> 4. Lessons learned — insights about the codebase or process
-> 5. Output improvement ideas as IDEA: lines (one per line)
-> 6. If useful scripts/tools were created, output as TOOL: name | language | description
-> 7. **Persist the retrospective**:
->    a. Append to `.pipeline-log.md` in the project root (create if needed, add to .gitignore). Format: `## <branch> — <date>` followed by task, PR, quality rating, what went well, lessons, improvements, follow-ups.
->    b. Post a retrospective summary as a comment on PR #`<pr_number>`: `gh pr comment <pr_number> --body '<formatted retro>'`
+>
+> Evaluate: quality rating (1-5), what went well, lessons learned, what could improve, IDEA: lines, TOOL: lines.
+>
+> **You MUST post the retrospective to these two places. This is not optional.**
+>
+> **1. GitHub PR comment** — run this command:
+> ```
+> gh pr comment <pr_number> --body "## Pipeline Retrospective
+>
+> **Quality**: X/5
+>
+> ### What Went Well
+> - ...
+>
+> ### Lessons Learned
+> - ...
+>
+> ### Suggested Improvements
+> - IDEA: ...
+>
+> ### Follow-up Tasks
+> - ..."
+> ```
+>
+> **2. Pipeline log** — append to `.pipeline-log.md` in the project root (create if needed, ensure it's in .gitignore). Use format: `## <branch> — <date>` followed by task, PR, quality, what went well, lessons, improvements, follow-ups. Separate entries with `---`.
+>
+> Output RETRO_COMPLETE when both posts are done.
 
 Collect and report the retrospective output. **The pipeline is now complete.**
 

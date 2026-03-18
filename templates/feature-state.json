@@ -1,0 +1,30 @@
+{
+  "pipeline_type": "feature",
+  "task_description": "",
+  "branch_name": "",
+  "pr_target_branch": "main",
+  "project_path": "",
+  "started_at": "",
+  "completed_at": null,
+  "current_stage": 1,
+  "stages": {
+    "1":  {"name": "Environment Check",  "status": "pending", "verdict": null, "checklist": ["git fetch origin", "checkout fresh branch from target", "verify python/venv", "install dependencies", "smoke test imports", "output ENV_OK or ENV_FAILED"]},
+    "2":  {"name": "Change Detection",   "status": "pending", "verdict": null, "checklist": ["git diff --name-only against target", "classify as CODE_CHANGES or DOCS_ONLY"]},
+    "3":  {"name": "Conflict Check",     "status": "pending", "verdict": null, "checklist": ["git diff --check", "grep for conflict markers", "output MERGE_CLEAN or MERGE_CONFLICTS_FOUND"]},
+    "4":  {"name": "Planning",           "status": "pending", "verdict": null, "checklist": ["read codebase for current state", "list files to create/modify", "key design decisions", "test strategy", "potential risks"]},
+    "5":  {"name": "Implementation",     "status": "pending", "verdict": null, "checklist": ["write tests first (TDD)", "implement to pass tests", "edge case checklist (null/empty/boundary/concurrent)", "git add -u + new files", "git status clean"]},
+    "6":  {"name": "Test Execution",     "status": "pending", "verdict": null, "checklist": ["run full test suite (read-only)", "report pass/fail counts", "output TESTS_PASSED or TESTS_FAILED", "skip if DOCS_ONLY"]},
+    "7":  {"name": "Self-Review",        "status": "pending", "verdict": null, "checklist": ["cross-ref plan vs implementation", "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "test coverage gaps", "type hints on public APIs", "code quality checks", "output REVIEW_PASSED or REVIEW_FAILED", "skip if DOCS_ONLY"]},
+    "8":  {"name": "Security Check",     "status": "pending", "verdict": null, "checklist": ["get changed files list", "scan for mark_safe/csrf_exempt/|safe/raw SQL/secrets/shell=True/JS string escaping", "broad scan for context (IMPROVEMENT: lines only)", "output SECURITY_PASSED or SECURITY_FAILED", "skip if DOCS_ONLY"]},
+    "9":  {"name": "Documentation",      "status": "pending", "verdict": null, "checklist": ["update docstrings/README/comments", "output DOCS_UPDATED"]},
+    "10": {"name": "Commit & PR",        "status": "pending", "verdict": null, "checklist": ["git remote -v (check for github)", "checkout/create branch", "git add -u + new files", "git diff --check clean", "commit with feat: prefix", "git push -u origin", "gh pr create", "output PR_CREATED/PR_EXISTS/PR_SKIPPED"]},
+    "11": {"name": "Code Review",        "status": "pending", "verdict": null, "checklist": ["[subagent] git diff against target", "load project PR checklist if exists", "review all categories", "check auto-reject triggers", "MANDATORY: gh pr review --comment with formatted review", "save to pr/feedback/ if dir exists"]},
+    "12": {"name": "Test Verification",  "status": "pending", "verdict": null, "checklist": ["[subagent] run full test suite", "report pass/fail"]},
+    "13": {"name": "Review Verdict",     "status": "pending", "verdict": null, "checklist": ["[subagent] synthesize findings", "MANDATORY: post verdict to GitHub (gh pr comment or gh pr review --request-changes)", "output APPROVE/REQUEST_CHANGES/COMMENT"]},
+    "14": {"name": "Merge PR",           "status": "pending", "verdict": null, "checklist": ["[subagent] gh pr merge --squash --delete-branch", "do NOT self-approve", "output PR_MERGED or MERGE_FAILED"]},
+    "15": {"name": "Retrospective",      "status": "pending", "verdict": null, "checklist": ["[subagent] rate quality 1-5", "what went well", "lessons learned", "IDEA: lines", "MANDATORY: gh pr comment with retro", "MANDATORY: append to .pipeline-log.md", "output RETRO_COMPLETE"]}
+  },
+  "pr_number": null,
+  "pr_url": null,
+  "rewind_count": 0
+}

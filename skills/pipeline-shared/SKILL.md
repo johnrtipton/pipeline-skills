@@ -44,15 +44,31 @@ Pipelines write progress to `.pipeline-state/<branch-name>.json` in the project 
 }
 ```
 
+### Initializing State
+
+At pipeline start, copy the appropriate template from the pipeline-skill repo's `templates/` directory:
+- `templates/feature-state.json` for feature pipelines
+- `templates/bugfix-state.json` for bugfix pipelines
+- `templates/refactor-state.json` for refactor pipelines
+
+Fill in: `task_description`, `branch_name`, `pr_target_branch`, `project_path`, `started_at`.
+
+Each stage has a `checklist` array listing every required action. Items prefixed with `MANDATORY:` must not be skipped — they are the actions most likely to be dropped by context compression (GitHub posting, log persistence).
+
+```bash
+mkdir -p .pipeline-state
+# Copy template and fill in task details
+```
+
 ### Writing State
 
 After each stage completes (pass or fail), update the state file:
-```bash
-mkdir -p .pipeline-state
-# Write updated JSON to .pipeline-state/<branch-name>.json
-```
 
-Update the `current_stage`, mark the completed stage's status as `passed` or `failed`, record the verdict string, and save any extracted data (PR number, PR URL).
+1. Set the stage's `status` to `passed` or `failed`
+2. Record the `verdict` string
+3. Increment `current_stage` to the next stage
+4. Save any extracted data (PR number, PR URL)
+5. **Check off checklist items** — mark completed items to track what was actually done vs skipped
 
 ### Reading State (Resume)
 
