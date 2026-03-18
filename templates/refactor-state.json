@@ -54,7 +54,8 @@
         {"action": "preserve ALL existing behavior — no functional changes", "done": false, "mandatory": true},
         {"action": "no new functionality added", "done": false},
         {"action": "git add -u + new files", "done": false},
-        {"action": "git status clean", "done": false, "mandatory": true}
+        {"action": "git status clean", "done": false, "mandatory": true},
+        {"action": "write list of all changed files to .pipeline-state/<branch>-changes.txt (git diff --name-only HEAD)", "done": false, "mandatory": true}
       ]
     },
     "5": {
@@ -99,9 +100,11 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-changes.txt for list of files modified by refactor", "done": false},
         {"action": "git remote -v — verify github remote exists", "done": false},
         {"action": "checkout/create branch", "done": false},
-        {"action": "git add -u + stage new files (not .env/secrets)", "done": false},
+        {"action": "git add -u to stage ALL modified tracked files", "done": false},
+        {"action": "git add each file from changes.txt to catch new files", "done": false},
         {"action": "commit with refactor: prefix", "done": false},
         {"action": "git push -u origin", "done": false},
         {"action": "gh pr create with summary", "done": false},
