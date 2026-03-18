@@ -136,55 +136,48 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
+      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists — use as review framework. Review for correctness, security (mark_safe/|safe/csrf_exempt/XSS/injection), testing gaps, code quality (print vs logging, f-string loggers, console.log guards, except:pass), docs (CHANGELOG updated), perf (N+1 queries), architecture. Flag auto-reject triggers. Step 2: Run project test suite, report pass/fail. Step 3: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 4 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 5: Output verdict.",
       "checklist": [
         {"action": "git diff against target branch", "done": false},
-        {"action": "load project PR checklist if exists", "done": false},
-        {"action": "review all categories (correctness/security/testing/quality/docs/perf/arch)", "done": false},
-        {"action": "check auto-reject triggers", "done": false},
-        {"action": "post review to GitHub: gh pr review --comment", "done": false, "mandatory": true},
-        {"action": "save to pr/feedback/ if directory exists", "done": false}
-      ]
-    },
-    "12": {
-      "name": "Test Verification",
-      "status": "pending",
-      "verdict": null,
-      "run_as": "subagent",
-      "checklist": [
-        {"action": "run full test suite", "done": false},
-        {"action": "report pass/fail", "done": false, "mandatory": true}
-      ]
-    },
-    "13": {
-      "name": "Review Verdict",
-      "status": "pending",
-      "verdict": null,
-      "run_as": "subagent",
-      "checklist": [
-        {"action": "synthesize code review + test results", "done": false},
-        {"action": "post verdict to GitHub PR", "done": false, "mandatory": true},
+        {"action": "load project PR checklist if exists (docs/PULL_REQUEST_CHECKLIST.md)", "done": false},
+        {"action": "review: correctness, security, testing, quality, docs, perf, architecture", "done": false},
+        {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false},
+        {"action": "run full test suite, report pass/fail", "done": false, "mandatory": true},
+        {"action": "post review to GitHub: gh pr review --comment with formatted checklist and findings", "done": false, "mandatory": true},
+        {"action": "save to pr/feedback/ if directory exists", "done": false},
         {"action": "output APPROVE/REQUEST_CHANGES/COMMENT", "done": false, "mandatory": true}
       ]
     },
-    "14": {
+    "12": {
+      "name": "Review Verdict",
+      "status": "pending",
+      "verdict": null,
+      "note": "Verdict is determined by the Code Review subagent above. If APPROVE, proceed to Merge. If REQUEST_CHANGES, fix issues, re-commit, re-push, re-run Code Review.",
+      "checklist": [
+        {"action": "if REQUEST_CHANGES: fix issues, re-commit, re-push, re-run stage 11", "done": false},
+        {"action": "if APPROVE: proceed to Merge", "done": false, "mandatory": true}
+      ]
+    },
+    "13": {
       "name": "Merge PR",
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
+      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Run: gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
       "checklist": [
         {"action": "gh pr merge --squash --delete-branch (do NOT self-approve)", "done": false, "mandatory": true},
         {"action": "output PR_MERGED or MERGE_FAILED", "done": false, "mandatory": true}
       ]
     },
-    "15": {
+    "14": {
       "name": "Retrospective",
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
+      "subagent_prompt": "Write retrospective for feature: {task_description}. Project: {project_path}. PR #{pr_number}. Run git log {pr_target_branch}..HEAD. Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Output RETRO_COMPLETE.",
       "checklist": [
         {"action": "rate quality 1-5", "done": false},
-        {"action": "what went well", "done": false},
-        {"action": "lessons learned", "done": false},
+        {"action": "what went well + lessons learned", "done": false},
         {"action": "IDEA: lines for improvements", "done": false},
         {"action": "post retrospective to GitHub PR: gh pr comment", "done": false, "mandatory": true},
         {"action": "append to .pipeline-log.md", "done": false, "mandatory": true},

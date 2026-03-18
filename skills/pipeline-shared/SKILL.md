@@ -133,36 +133,47 @@ Add `.pipeline-state/` to `.gitignore` — state files should not be committed.
 
 ---
 
-## Quality Gate Protocol
+## Stage Loop — The State File Drives the Pipeline
 
-This protocol runs at the **start** and **end** of EVERY stage — it is the heartbeat of the pipeline.
+**The state file is the program counter.** Do not try to remember all stages from the skill text — the skill text WILL be compressed out of context during long runs. Instead, follow this loop:
 
-### Before starting each stage:
+### The Loop (repeat until all stages are done):
 
-1. **Check state file exists**: If `.pipeline-state/<branch-name>.json` does NOT exist, create it now from the appropriate template (feature/bugfix/refactor). Fill in task_description, branch_name, pr_target_branch, project_path, started_at. This is a safety net — Step 0 should have created it, but if it was lost to context compression, this catches it.
-2. **Read current stage from state file**: Verify this stage hasn't already been completed (status = `passed`). If it has, skip to the next incomplete stage.
+```
+1. READ the state file: .pipeline-state/<branch-name>.json
+2. FIND the next stage where status != "passed"
+3. READ that stage's checklist items — these are your instructions
+4. EXECUTE each checklist item, marking done: true as you go
+5. For items marked mandatory: true — you MUST complete these
+6. WRITE the verdict and update the state file
+7. GO TO step 1
+```
 
-### After completing each stage:
+### Before each stage:
 
-1. **Output the verdict**: Every stage MUST output its verdict string on its own line. Do not proceed without it.
-2. **Update the state file**: Write the stage result to `.pipeline-state/<branch-name>.json`:
-   - Set the stage's `status` to `passed` or `failed`
-   - Set the `verdict` string
-   - Mark each checklist item's `done` to `true` or `false`
-   - Verify all `mandatory` checklist items are `done: true` before marking passed
-   - Increment `current_stage`
-   - Save PR number/URL if extracted
-   ```bash
-   # Update the state file after EVERY stage — this enables resume on interruption
-   ```
-3. **Proceed or stop**: Based on the verdict, continue to the next stage or follow retry/rewind/stop rules.
+1. **Read the state file**. If it doesn't exist, create it from the template NOW.
+2. Find the current stage (first non-`passed` stage).
+3. Read its `checklist` array — these are the specific actions for this stage.
+4. If the stage has `"run_as": "subagent"`, spawn it as a subagent via the Agent tool.
+5. If the stage has `"skip_if": "DOCS_ONLY"` and Change Detection returned DOCS_ONLY, mark it passed and go to next.
+
+### After each stage:
+
+1. Mark each checklist item's `done` field.
+2. **Verify all `mandatory` items are `done: true`** — if any mandatory item is not done, go back and do it before proceeding.
+3. Set the stage's `status` to `passed` or `failed`, record the `verdict`.
+4. Write the updated state file to disk.
+5. Continue the loop.
 
 ### Gate rules:
 
-- **Explicit FAILED overrides PASSED**: If output contains both `TESTS_PASSED` and `TESTS_FAILED`, the result is **FAILED**. The failure marker always wins.
-- **Retry protocol**: On first failure, re-examine the issue and try again (attempt 2 of 2). If second attempt also fails, follow the stage's failure action (stop or rewind).
-- **Rewind protocol**: When a stage rewinds, carry the failure details as context. Re-plan/re-diagnose addressing every flagged issue. Maximum 1 rewind per pipeline run.
-- **Never skip the verdict**: Every stage MUST end with its verdict string.
+- **Explicit FAILED overrides PASSED**: If output contains both `TESTS_PASSED` and `TESTS_FAILED`, the result is **FAILED**.
+- **Retry**: On first failure, retry once. If second attempt fails, follow the stage's failure action (stop or rewind).
+- **Rewind**: Carry failure details as context. Re-plan/re-diagnose. Maximum 1 rewind per pipeline run.
+
+### Why this works:
+
+The state file is re-read from disk at each stage boundary. Even if the skill text is fully compressed out of context, the state file on disk still has every stage and every checklist item. The agent just needs to follow the loop: read → find next → execute checklist → write → repeat.
 
 ---
 
