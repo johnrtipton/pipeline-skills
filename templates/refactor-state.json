@@ -82,8 +82,12 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
-        {"action": "update docstrings/README/inline comments", "done": false},
-        {"action": "output DOCS_UPDATED", "done": false, "mandatory": true}
+        {"action": "discover project docs structure (read docs/README.md or index)", "done": false},
+        {"action": "add/update docstrings for modified public APIs", "done": false},
+        {"action": "update existing docs that reference moved/renamed code", "done": false},
+        {"action": "update CHANGELOG.md if behavior-visible refactor", "done": false},
+        {"action": "verify no broken internal links or orphaned docs", "done": false},
+        {"action": "output DOCS_UPDATED with categorized list", "done": false, "mandatory": true}
       ]
     },
     "8": {

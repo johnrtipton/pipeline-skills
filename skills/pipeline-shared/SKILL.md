@@ -267,18 +267,79 @@ IMPROVEMENT: Security: <brief description of issue and file>
 
 ## Documentation
 
-Update documentation for the changes made.
+Ensure all user-facing and developer documentation is complete, accurate, and well-structured for the changes made.
 
 ### Steps
 
-1. Update relevant docstrings, README sections, and inline comments as needed
-2. Do not create unnecessary documentation files
-3. Focus on what changed and why
+#### 1. Discover the project's docs structure
+
+Look for a documentation directory — common locations:
+- `docs/` with a `README.md` index (the djust pattern — organized by topic with guides/, components/, etc.)
+- `docs/` with mkdocs/sphinx config
+- Top-level `README.md` only
+
+Read the docs index (e.g., `docs/README.md`) to understand how documentation is organized. This tells you where new docs should go and what existing docs need updating.
+
+#### 2. Code-level documentation
+
+- **Docstrings**: Add or update docstrings for all new/modified public classes, methods, and functions
+- **Type annotations**: Ensure public APIs have type hints (they serve as documentation)
+- **Inline comments**: Add comments only where logic isn't self-evident
+
+#### 3. User-facing documentation
+
+For new features or significant changes, determine what documentation users need:
+
+**Guide or reference page** — Does this feature need its own doc?
+- New user-facing feature (attribute, decorator, mixin, command) → YES, create a guide
+- Place it in the appropriate docs subdirectory (e.g., `docs/guides/` for how-to guides)
+- Follow the existing docs style and structure (check 2-3 nearby docs for conventions)
+- Include: what it does, when to use it, API/usage, example code, common patterns
+
+**Existing docs update** — Does this change affect an existing doc?
+- Search docs for references to the feature area you changed
+- Update any outdated examples, API references, or descriptions
+- If a guide covers the area you modified, update it to reflect the new behavior
+
+**Docs index** — If you created a new doc page, add it to the docs index/README under the appropriate section with a one-line description.
+
+#### 4. CHANGELOG
+
+For `feat:` and `fix:` changes:
+- Update `CHANGELOG.md` (if the project has one)
+- Add an entry under the current/unreleased version section
+- Follow the existing format (typically: `- **Feature name** — description (#issue)`)
+
+#### 5. CLAUDE.md / project config
+
+If the change introduces:
+- New conventions, patterns, or architectural decisions
+- New commands, make targets, or scripts
+- New project structure (directories, key files)
+
+Suggest updating `CLAUDE.md` to reflect these (note in your output, don't modify CLAUDE.md directly unless the pipeline is for that project).
+
+#### 6. Quality checks
+
+- No orphaned docs — if you renamed/removed a feature, remove or redirect its docs
+- No broken internal links — verify `[link text](path)` references are valid
+- Examples compile/run — code examples should be accurate and tested
+- Consistent terminology — use the same names the code uses
 
 ### Gate
-- **Pass**: `DOCS_UPDATED` — followed by a list of files modified and what changed
-- If no documentation changes were needed: `DOCS_UPDATED` followed by "No changes needed."
-- This gate always passes.
+- **Pass**: `DOCS_UPDATED` — followed by a categorized list:
+  ```
+  DOCS_UPDATED
+  Code docs:
+  - path/to/file.py: added docstring for FeatureClass
+  User docs:
+  - docs/guides/new-feature.md: created guide for dj-value-* attribute
+  - docs/README.md: added link under Real-Time Features section
+  CHANGELOG:
+  - CHANGELOG.md: added entry for feat: dj-value-* static event params
+  ```
+- If no documentation changes were needed: `DOCS_UPDATED` followed by "No changes needed — documentation is current."
+- This gate always passes, but incomplete documentation should be flagged for the Code Review stage to catch.
 
 ---
 
