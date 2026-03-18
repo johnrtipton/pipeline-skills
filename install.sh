@@ -20,4 +20,4 @@ for skill in "${SCRIPT_DIR}/skills/pipeline-"*; do
     fi
 done
 
-echo "Done. Skills available: /pipeline-feature, /pipeline-bugfix, /pipeline-refactor, /pipeline-auto"
+echo "Done. Skills available: /pipeline-next, /pipeline-run, pipeline-shared (reference)"
