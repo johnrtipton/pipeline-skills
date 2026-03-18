@@ -49,10 +49,16 @@ Print status of all matching tasks. Pick the first one that's not done.
 
 ### 6. Create the state file
 
-This is the critical step. Read the appropriate template from the pipeline-skill repo:
-- `~/online_projects/ai/pipeline-skill/templates/feature-state.json`
-- `~/online_projects/ai/pipeline-skill/templates/bugfix-state.json`
-- `~/online_projects/ai/pipeline-skill/templates/refactor-state.json`
+This is the critical step. Read the template file DIRECTLY — do not search for it:
+
+```bash
+# For features:
+cat ~/online_projects/ai/pipeline-skill/templates/feature-state.json
+# For bugfixes:
+cat ~/online_projects/ai/pipeline-skill/templates/bugfix-state.json
+# For refactors:
+cat ~/online_projects/ai/pipeline-skill/templates/refactor-state.json
+```
 
 Copy it, fill in:
 - `task_description`: the full ROADMAP spec
