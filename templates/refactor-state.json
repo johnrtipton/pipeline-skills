@@ -49,6 +49,7 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-analysis.md for the refactoring plan", "done": false, "mandatory": true},
         {"action": "apply refactoring per analysis plan", "done": false},
         {"action": "preserve ALL existing behavior — no functional changes", "done": false, "mandatory": true},
         {"action": "no new functionality added", "done": false},

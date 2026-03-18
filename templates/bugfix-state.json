@@ -49,6 +49,7 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-diagnosis.md for the diagnosis and proposed fix", "done": false, "mandatory": true},
         {"action": "implement minimal focused fix", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
         {"action": "git add -u + new files", "done": false},
