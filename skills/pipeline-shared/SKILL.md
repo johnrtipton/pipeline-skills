@@ -116,12 +116,29 @@ Add `.pipeline-state/` to `.gitignore` — state files should not be committed.
 
 ## Quality Gate Protocol
 
-Every stage MUST output its verdict string on its own line. Follow these rules:
+Every stage MUST follow this protocol when it completes. This runs after EVERY stage — it is the heartbeat of the pipeline.
 
-1. **Explicit FAILED overrides PASSED**: If output contains both `TESTS_PASSED` and `TESTS_FAILED`, the result is **FAILED**. The failure marker always wins.
-2. **Retry protocol**: On first failure, re-examine the issue and try again (attempt 2 of 2). If second attempt also fails, follow the stage's failure action (stop or rewind).
-3. **Rewind protocol**: When a stage rewinds, carry the failure details as context. Re-plan/re-diagnose addressing every flagged issue. Maximum 1 rewind per pipeline run.
-4. **Never skip the verdict**: Every stage MUST end with its verdict string. Do not proceed without it.
+### After completing each stage:
+
+1. **Output the verdict**: Every stage MUST output its verdict string on its own line. Do not proceed without it.
+2. **Update the state file**: Write the stage result to `.pipeline-state/<branch-name>.json`:
+   - Set the stage's `status` to `passed` or `failed`
+   - Set the `verdict` string
+   - Mark each checklist item's `done` to `true` or `false`
+   - Verify all `mandatory` checklist items are `done: true` before marking passed
+   - Increment `current_stage`
+   - Save PR number/URL if extracted
+   ```bash
+   # Update the state file after EVERY stage — this enables resume on interruption
+   ```
+3. **Proceed or stop**: Based on the verdict, continue to the next stage or follow retry/rewind/stop rules.
+
+### Gate rules:
+
+- **Explicit FAILED overrides PASSED**: If output contains both `TESTS_PASSED` and `TESTS_FAILED`, the result is **FAILED**. The failure marker always wins.
+- **Retry protocol**: On first failure, re-examine the issue and try again (attempt 2 of 2). If second attempt also fails, follow the stage's failure action (stop or rewind).
+- **Rewind protocol**: When a stage rewinds, carry the failure details as context. Re-plan/re-diagnose addressing every flagged issue. Maximum 1 rewind per pipeline run.
+- **Never skip the verdict**: Every stage MUST end with its verdict string.
 
 ---
 
