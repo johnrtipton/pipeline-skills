@@ -187,7 +187,15 @@ Based on the task type:
 
 After each task completes (success or failure):
 
-1. **Update a tracking file** at `.pipeline-status.md` in the project root:
+1. **Update ROADMAP.md** — Mark the completed feature in the roadmap:
+   - Find the feature's bold name line (e.g., `**VDOM structural patching**`)
+   - Prepend a status marker: `**VDOM structural patching** (#559) — ✅ PR #563 (2026-03-18)`
+   - If failed: `**Event sequencing** (#560) — ❌ Pipeline failed at Test Execution (2026-03-18)`
+   - Commit the ROADMAP update: `git add ROADMAP.md && git commit -m "docs: mark <feature> as completed in ROADMAP (PR #<number>)"`
+   - Push to the dev branch so the status is visible
+   - **Only modify the status marker** — do not change the feature description or move it between sections
+
+2. **Update tracking file** at `.pipeline-status.md` in the project root:
    ```markdown
    # Pipeline Status
 
@@ -198,9 +206,9 @@ After each task completes (success or failure):
    - [ ] dj-value-* static event params — pending
    ```
 
-2. **If task failed**: Print a summary of what failed and why. Do NOT attempt to fix it — move to the next task (if `--all`) or stop.
+3. **If task failed**: Print a summary of what failed and why. Do NOT attempt to fix it — move to the next task (if `--all`) or stop.
 
-3. **If task succeeded**: Print the PR URL and continue to next task (if `--all`).
+4. **If task succeeded**: Print the PR URL and continue to next task (if `--all`).
 
 ---
 
