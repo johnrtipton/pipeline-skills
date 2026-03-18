@@ -8,19 +8,159 @@
   "completed_at": null,
   "current_stage": 1,
   "stages": {
-    "1":  {"name": "Environment Check",  "status": "pending", "verdict": null, "checklist": ["git fetch origin", "checkout fresh branch from target", "verify python/venv", "install dependencies", "smoke test imports", "output ENV_OK or ENV_FAILED"]},
-    "2":  {"name": "Conflict Check",     "status": "pending", "verdict": null, "checklist": ["git diff --check", "grep for conflict markers", "output MERGE_CLEAN or MERGE_CONFLICTS_FOUND"]},
-    "3":  {"name": "Analysis",           "status": "pending", "verdict": null, "checklist": ["current structure and patterns", "code smells and issues", "proposed refactoring approach", "files affected", "risk assessment"]},
-    "4":  {"name": "Refactor Execution", "status": "pending", "verdict": null, "checklist": ["apply refactoring per analysis", "preserve ALL existing behavior", "no new functionality", "git add -u + new files", "git status clean"]},
-    "5":  {"name": "Test Execution",     "status": "pending", "verdict": null, "checklist": ["run full test suite (read-only)", "report pass/fail counts", "output TESTS_PASSED or TESTS_FAILED"]},
-    "6":  {"name": "Review",             "status": "pending", "verdict": null, "checklist": ["cross-ref analysis vs refactoring", "verify behavior preserved", "no dead code", "naming consistency", "output REVIEW_PASSED or REVIEW_FAILED"]},
-    "7":  {"name": "Documentation",      "status": "pending", "verdict": null, "checklist": ["update docstrings/README/comments", "output DOCS_UPDATED"]},
-    "8":  {"name": "Commit & PR",        "status": "pending", "verdict": null, "checklist": ["git remote -v (check for github)", "checkout/create branch", "commit with refactor: prefix", "git push -u origin", "gh pr create", "output PR_CREATED/PR_EXISTS/PR_SKIPPED"]},
-    "9":  {"name": "Code Review",        "status": "pending", "verdict": null, "checklist": ["[subagent] git diff against target", "load project PR checklist if exists", "verify behavior preserved", "check auto-reject triggers", "MANDATORY: gh pr review --comment with formatted review", "save to pr/feedback/ if dir exists"]},
-    "10": {"name": "Test Verification",  "status": "pending", "verdict": null, "checklist": ["[subagent] run full test suite", "report pass/fail"]},
-    "11": {"name": "Review Verdict",     "status": "pending", "verdict": null, "checklist": ["[subagent] synthesize findings", "MANDATORY: post verdict to GitHub", "output APPROVE/REQUEST_CHANGES/COMMENT"]},
-    "12": {"name": "Merge PR",           "status": "pending", "verdict": null, "checklist": ["[subagent] gh pr merge --squash --delete-branch", "do NOT self-approve", "output PR_MERGED or MERGE_FAILED"]},
-    "13": {"name": "Retrospective",      "status": "pending", "verdict": null, "checklist": ["[subagent] rate quality 1-5", "what went well", "lessons learned", "IDEA: lines", "MANDATORY: gh pr comment with retro", "MANDATORY: append to .pipeline-log.md", "output RETRO_COMPLETE"]}
+    "1": {
+      "name": "Environment Check",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "git fetch origin", "done": false},
+        {"action": "checkout fresh branch from target", "done": false},
+        {"action": "verify python/venv", "done": false},
+        {"action": "install dependencies", "done": false},
+        {"action": "smoke test imports", "done": false},
+        {"action": "output ENV_OK or ENV_FAILED", "done": false, "mandatory": true}
+      ]
+    },
+    "2": {
+      "name": "Conflict Check",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "git diff --check", "done": false},
+        {"action": "grep for conflict markers", "done": false},
+        {"action": "output MERGE_CLEAN or MERGE_CONFLICTS_FOUND", "done": false, "mandatory": true}
+      ]
+    },
+    "3": {
+      "name": "Analysis",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "current structure and patterns", "done": false},
+        {"action": "code smells and issues", "done": false},
+        {"action": "proposed refactoring approach (step by step)", "done": false},
+        {"action": "list all files affected", "done": false},
+        {"action": "risk assessment", "done": false}
+      ]
+    },
+    "4": {
+      "name": "Refactor Execution",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "apply refactoring per analysis plan", "done": false},
+        {"action": "preserve ALL existing behavior — no functional changes", "done": false, "mandatory": true},
+        {"action": "no new functionality added", "done": false},
+        {"action": "git add -u + new files", "done": false},
+        {"action": "git status clean", "done": false, "mandatory": true}
+      ]
+    },
+    "5": {
+      "name": "Test Execution",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "run full test suite (read-only, no source modifications)", "done": false},
+        {"action": "report pass/fail counts", "done": false},
+        {"action": "output TESTS_PASSED or TESTS_FAILED", "done": false, "mandatory": true}
+      ]
+    },
+    "6": {
+      "name": "Review",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "cross-ref analysis plan vs refactoring — flag unimplemented changes", "done": false},
+        {"action": "verify behavior preserved", "done": false, "mandatory": true},
+        {"action": "no dead code left behind", "done": false},
+        {"action": "naming consistency", "done": false},
+        {"action": "output REVIEW_PASSED or REVIEW_FAILED", "done": false, "mandatory": true}
+      ]
+    },
+    "7": {
+      "name": "Documentation",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "update docstrings/README/inline comments", "done": false},
+        {"action": "output DOCS_UPDATED", "done": false, "mandatory": true}
+      ]
+    },
+    "8": {
+      "name": "Commit & PR",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "git remote -v — verify github remote exists", "done": false},
+        {"action": "checkout/create branch", "done": false},
+        {"action": "git add -u + stage new files (not .env/secrets)", "done": false},
+        {"action": "commit with refactor: prefix", "done": false},
+        {"action": "git push -u origin", "done": false},
+        {"action": "gh pr create with summary", "done": false},
+        {"action": "output PR_CREATED/PR_EXISTS/PR_SKIPPED", "done": false, "mandatory": true}
+      ]
+    },
+    "9": {
+      "name": "Code Review",
+      "status": "pending",
+      "verdict": null,
+      "run_as": "subagent",
+      "checklist": [
+        {"action": "git diff against target branch", "done": false},
+        {"action": "load project PR checklist if exists", "done": false},
+        {"action": "verify behavior preserved — refactor must not change functionality", "done": false, "mandatory": true},
+        {"action": "review all categories (correctness/security/testing/quality/docs/perf)", "done": false},
+        {"action": "check auto-reject triggers", "done": false},
+        {"action": "post review to GitHub: gh pr review --comment", "done": false, "mandatory": true},
+        {"action": "save to pr/feedback/ if directory exists", "done": false}
+      ]
+    },
+    "10": {
+      "name": "Test Verification",
+      "status": "pending",
+      "verdict": null,
+      "run_as": "subagent",
+      "checklist": [
+        {"action": "run full test suite", "done": false},
+        {"action": "report pass/fail", "done": false, "mandatory": true}
+      ]
+    },
+    "11": {
+      "name": "Review Verdict",
+      "status": "pending",
+      "verdict": null,
+      "run_as": "subagent",
+      "checklist": [
+        {"action": "synthesize code review + test results", "done": false},
+        {"action": "post verdict to GitHub PR", "done": false, "mandatory": true},
+        {"action": "output APPROVE/REQUEST_CHANGES/COMMENT", "done": false, "mandatory": true}
+      ]
+    },
+    "12": {
+      "name": "Merge PR",
+      "status": "pending",
+      "verdict": null,
+      "run_as": "subagent",
+      "checklist": [
+        {"action": "gh pr merge --squash --delete-branch (do NOT self-approve)", "done": false, "mandatory": true},
+        {"action": "output PR_MERGED or MERGE_FAILED", "done": false, "mandatory": true}
+      ]
+    },
+    "13": {
+      "name": "Retrospective",
+      "status": "pending",
+      "verdict": null,
+      "run_as": "subagent",
+      "checklist": [
+        {"action": "rate quality 1-5", "done": false},
+        {"action": "what went well", "done": false},
+        {"action": "lessons learned", "done": false},
+        {"action": "IDEA: lines for improvements", "done": false},
+        {"action": "post retrospective to GitHub PR: gh pr comment", "done": false, "mandatory": true},
+        {"action": "append to .pipeline-log.md", "done": false, "mandatory": true},
+        {"action": "output RETRO_COMPLETE", "done": false, "mandatory": true}
+      ]
+    }
   },
   "pr_number": null,
   "pr_url": null,

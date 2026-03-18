@@ -53,7 +53,17 @@ At pipeline start, copy the appropriate template from the pipeline-skill repo's 
 
 Fill in: `task_description`, `branch_name`, `pr_target_branch`, `project_path`, `started_at`.
 
-Each stage has a `checklist` array listing every required action. Items prefixed with `MANDATORY:` must not be skipped — they are the actions most likely to be dropped by context compression (GitHub posting, log persistence).
+Each stage has a `checklist` array of objects:
+```json
+{"action": "post review to GitHub: gh pr review --comment", "done": false, "mandatory": true}
+```
+
+- `action` — what to do
+- `done` — set to `true` when completed
+- `mandatory` — if `true`, this action must not be skipped (GitHub posting, verdicts, log persistence)
+
+Stages with `"run_as": "subagent"` run as Agent tool subagents with fresh context.
+Stages with `"skip_if": "DOCS_ONLY"` are skipped when Change Detection returned DOCS_ONLY.
 
 ```bash
 mkdir -p .pipeline-state
@@ -64,11 +74,13 @@ mkdir -p .pipeline-state
 
 After each stage completes (pass or fail), update the state file:
 
-1. Set the stage's `status` to `passed` or `failed`
-2. Record the `verdict` string
-3. Increment `current_stage` to the next stage
-4. Save any extracted data (PR number, PR URL)
-5. **Check off checklist items** — mark completed items to track what was actually done vs skipped
+1. Set each checklist item's `done` to `true` as you complete it
+2. Set the stage's `status` to `passed` or `failed`
+3. Record the `verdict` string
+4. Increment `current_stage` to the next stage
+5. Save any extracted data (PR number, PR URL)
+
+**Before marking a stage as passed, verify all `mandatory` checklist items have `done: true`.** If a mandatory item was skipped, go back and do it before proceeding.
 
 ### Reading State (Resume)
 
