@@ -190,9 +190,11 @@ Use the **Agent tool** to spawn a subagent:
 
 Use the **Agent tool** to spawn a subagent:
 
-> Review the pipeline execution for the refactor: `<task description>`. Project: `<project_path>`.
+> Review the pipeline execution for the refactor: `<task description>`. Project: `<project_path>`. PR #`<pr_number>`.
 > Run `git log --oneline <pr_target_branch>..HEAD`.
-> Rate quality (1-5), what went well, what could improve. Output IDEA: and TOOL: lines.
+> 1. Rate quality (1-5), what went well, lessons learned, what could improve.
+> 2. Output IDEA: and TOOL: lines.
+> 3. **Persist**: Append to `.pipeline-log.md` (create if needed, add to .gitignore). Post retro summary as `gh pr comment <pr_number> --body '<formatted retro>'`.
 
 **The pipeline is now complete.**
 

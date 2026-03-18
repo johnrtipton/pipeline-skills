@@ -513,13 +513,14 @@ Review the pipeline execution and provide feedback for continuous improvement.
 1. Rate the execution quality (1-5)
 2. What went well?
 3. What could improve? (prompt quality, stage ordering, quality gates)
-4. Suggest follow-up tasks if needed
-5. Output improvement ideas as `IDEA:` lines — one per line:
+4. Lessons learned — insights about the codebase, architecture, or process
+5. Suggest follow-up tasks if needed
+6. Output improvement ideas as `IDEA:` lines — one per line:
    ```
    IDEA: Add retry backoff to reduce flaky test failures
    IDEA: Split large prompts into focused sub-prompts
    ```
-6. If you created useful scripts or tools, output as:
+7. If you created useful scripts or tools, output as:
    ```
    TOOL: name | language | one-line description
    ```
@@ -527,6 +528,67 @@ Review the pipeline execution and provide feedback for continuous improvement.
 Be concise. Focus on actionable improvements.
 
 **Important**: Use the Agent tool to run this as a subagent for independent evaluation with clean context.
+
+### Persist Retrospective Output
+
+Retrospective insights are valuable across pipeline runs. Save them to three places:
+
+#### 1. Pipeline Log (per-task record)
+
+Append to `.pipeline-log.md` in the project root:
+
+```markdown
+## <branch-name> — <date>
+**Task**: <task description>
+**PR**: #<number> — <status>
+**Quality**: <rating>/5
+**Duration**: <stages completed> stages
+
+### What Went Well
+- <bullet points>
+
+### Lessons Learned
+- <bullet points>
+
+### Pipeline Improvements
+- <IDEA: lines>
+
+### Follow-up Tasks
+- <if any>
+
+---
+```
+
+This creates a running history of all pipeline executions on the project. Add `.pipeline-log.md` to `.gitignore`.
+
+#### 2. GitHub PR Comment
+
+Post a retrospective summary as a comment on the PR (even if already merged):
+```bash
+gh pr comment <pr_number> --body "$(cat <<'RETRO'
+## Pipeline Retrospective
+
+**Quality**: <rating>/5
+
+**What went well**: <summary>
+
+**Lessons learned**: <summary>
+
+**Suggested improvements**: <IDEA lines>
+RETRO
+)"
+```
+
+This keeps the retrospective attached to the PR for future reference.
+
+#### 3. Project Memory (if orchestrator is available)
+
+If the project uses djust-orchestrator memory, write key lessons:
+```bash
+python manage.py memory_write --level project --project <project> --append '<lesson>'
+```
+
+If not, check if the project has a `docs/LESSONS_LEARNED.md` or similar file and append there. If neither exists, the pipeline log and PR comment are sufficient — do not create new documentation files.
 
 ---
 

@@ -249,13 +249,17 @@ Collect the subagent's output.
 
 Use the **Agent tool** to spawn a subagent with this prompt:
 
-> Review the pipeline execution for the task: `<task description>`. The project is at `<project_path>`.
+> Review the pipeline execution for the task: `<task description>`. The project is at `<project_path>`. PR #`<pr_number>`.
 > Run `git log --oneline <pr_target_branch>..HEAD` to see what was done.
 > 1. Rate execution quality (1-5)
 > 2. What went well?
 > 3. What could improve?
-> 4. Output improvement ideas as IDEA: lines (one per line)
-> 5. If useful scripts/tools were created, output as TOOL: name | language | description
+> 4. Lessons learned — insights about the codebase or process
+> 5. Output improvement ideas as IDEA: lines (one per line)
+> 6. If useful scripts/tools were created, output as TOOL: name | language | description
+> 7. **Persist the retrospective**:
+>    a. Append to `.pipeline-log.md` in the project root (create if needed, add to .gitignore). Format: `## <branch> — <date>` followed by task, PR, quality rating, what went well, lessons, improvements, follow-ups.
+>    b. Post a retrospective summary as a comment on PR #`<pr_number>`: `gh pr comment <pr_number> --body '<formatted retro>'`
 
 Collect and report the retrospective output. **The pipeline is now complete.**
 
