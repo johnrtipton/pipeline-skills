@@ -13,6 +13,8 @@ Run a complete feature development cycle with quality gates, retry, and rewind c
 
 **Usage**: `/pipeline-feature <task description>`
 
+**CRITICAL: You MUST execute ALL 15 stages. Do NOT stop after Commit & PR (Stage 10). Stages 11-15 (Code Review, Test Verification, Review Verdict, Merge PR, Retrospective) are mandatory — they are where quality is verified and the PR is merged. A pipeline that stops at Stage 10 is incomplete.**
+
 ---
 
 ## Before You Start
@@ -120,7 +122,22 @@ Check for:
 
 1. **Plan compliance**: Cross-reference the Planning stage output (Stage 4) against the implementation. List every deliverable from the plan and mark each as DONE or MISSING. If any scope was silently dropped, output `REVIEW_FAILED` with the missing items.
 
-2. **Auto-reject triggers**: Skipped tests, `noqa` on security issues
+2. **Auto-reject triggers** (any of these → `REVIEW_FAILED`):
+   - `print()` statements instead of project logging system
+   - f-string formatting in logger calls (use `%s` style instead)
+   - `console.log` in production JS without debug guard (e.g., `if (globalThis.djustDebug)`)
+   - Silent exception handling (`except: pass`, `except Exception: pass`)
+   - No tests for new functionality
+   - Tests reference modules/APIs that don't exist in the diff
+   - `mark_safe()` with unescaped interpolated values
+   - `|safe` template filter on user-controlled variables
+   - `@csrf_exempt` without documented justification
+   - Placeholder/stub implementations (`return True`, hardcoded fake data)
+   - Comments indicating incomplete code ("simulate", "would be implemented", "for now")
+   - Untracked files that tests depend on are missing from the diff
+   - `noqa` on security issues
+   - New JS feature files without corresponding test files
+   - Missing CHANGELOG.md update for `feat:` or `fix:` changes
 
 3. **Test coverage gaps**: New code paths without tests
 
@@ -174,51 +191,60 @@ Use conventional commit format: `feat: <description>`
 
 Gate: `PR_CREATED`, `PR_EXISTS`, or `PR_SKIPPED`.
 
----
-
-## Stage 11: Code Review
-
-Follow the **Code Review** procedure from pipeline-shared.
-
-Gate: `REVIEW_COMPLETE` (always passes, informational).
+**After this stage completes, you MUST continue to Stage 11. The pipeline is NOT done.**
 
 ---
 
-## Stage 12: Test Verification
+## Stages 11-15: Review, Verify, Merge, Retrospective
 
-Follow the **Test Verification** procedure from pipeline-shared.
+**These stages run as subagents to ensure they execute with fresh context.** This prevents context compression from losing the review instructions — the same reason the orchestrator uses fresh sessions for these stages.
 
-Gate: `TESTS_PASSED` required.
+### Stage 11-13: Code Review + Test Verification + Review Verdict
 
-**On TESTS_FAILED**: Retry once. If retry fails → **STOP PIPELINE**.
+Use the **Agent tool** to spawn a subagent with this prompt:
 
----
+> You are reviewing a pull request. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
+>
+> **Step 1 — Code Review**: Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework. Review for: correctness, security (mark_safe, |safe, csrf_exempt, XSS, injection), testing gaps, code quality (print vs logging, f-string in loggers, silent exceptions, console.log without debug guards), documentation (CHANGELOG updated for feat/fix), performance (N+1 queries), architecture. Flag auto-reject triggers: print() instead of logging, f-string in loggers, unguarded console.log, except:pass, no tests for new code, tests referencing phantom modules, mark_safe with unescaped interpolation, placeholder/stub code.
+>
+> **Step 2 — Test Verification**: Run the project test suite. Report pass/fail. If tests fail, output TESTS_FAILED.
+>
+> **Step 3 — Review Verdict**: Synthesize findings. If any auto-reject triggers found OR tests failed → output REQUEST_CHANGES with the list. Otherwise → output APPROVE. Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
 
-## Stage 13: Review Verdict
+Collect the subagent's output.
 
-Follow the **Review Verdict** procedure from pipeline-shared.
+- If `APPROVE` → proceed to Stage 14
+- If `REQUEST_CHANGES` → fix the issues listed, re-commit, re-push, then re-run this subagent. If second attempt also returns `REQUEST_CHANGES` → **STOP PIPELINE**.
+- If `TESTS_FAILED` → fix and retry once. If still failing → **STOP PIPELINE**.
 
-Synthesize Code Review and Test Verification findings. Output `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`.
+### Stage 14: Merge PR
 
-If `REQUEST_CHANGES`: list the issues that need to be addressed. These become follow-up tasks.
+Use the **Agent tool** to spawn a subagent with this prompt:
 
----
+> Approve and merge PR #`<pr_number>` in `<project_path>`.
+> 1. Run: `gh pr review <pr_number> --approve --body 'Auto-approved: tests pass, review complete.'`
+> 2. Run: `gh pr merge <pr_number> --squash --delete-branch`
+> 3. If merge succeeds, output: PR_MERGED
+> 4. If merge fails, output: MERGE_FAILED followed by error details.
 
-## Stage 14: Merge PR
+Collect the subagent's output.
 
-Follow the **Merge PR** procedure from pipeline-shared.
+- If `PR_MERGED` → proceed to Stage 15
+- If `MERGE_FAILED` → retry once. If still failing → **STOP PIPELINE**.
 
-Gate: `PR_MERGED` required.
+### Stage 15: Retrospective
 
-**On MERGE_FAILED**: Retry once. If retry fails → **STOP PIPELINE**.
+Use the **Agent tool** to spawn a subagent with this prompt:
 
----
+> Review the pipeline execution for the task: `<task description>`. The project is at `<project_path>`.
+> Run `git log --oneline <pr_target_branch>..HEAD` to see what was done.
+> 1. Rate execution quality (1-5)
+> 2. What went well?
+> 3. What could improve?
+> 4. Output improvement ideas as IDEA: lines (one per line)
+> 5. If useful scripts/tools were created, output as TOOL: name | language | description
 
-## Stage 15: Retrospective
-
-Follow the **Retrospective** procedure from pipeline-shared. Use the Agent tool to run this as a subagent for independent evaluation.
-
-Rate the execution, identify improvements, output `IDEA:` and `TOOL:` lines.
+Collect and report the retrospective output. **The pipeline is now complete.**
 
 ---
 

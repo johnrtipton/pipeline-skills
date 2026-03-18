@@ -13,6 +13,8 @@ Run a complete refactoring cycle with analysis, behavior-preserving execution, r
 
 **Usage**: `/pipeline-refactor <refactor description>`
 
+**CRITICAL: You MUST execute ALL 13 stages. Do NOT stop after Commit & PR (Stage 8). Stages 9-13 (Code Review, Test Verification, Review Verdict, Merge PR, Retrospective) are mandatory.**
+
 ---
 
 ## Before You Start
@@ -140,47 +142,50 @@ Use conventional commit format: `refactor: <description>`
 
 Gate: `PR_CREATED`, `PR_EXISTS`, or `PR_SKIPPED`.
 
----
-
-## Stage 9: Code Review
-
-Follow the **Code Review** procedure from pipeline-shared.
-
-Gate: `REVIEW_COMPLETE` (always passes, informational).
+**After this stage completes, you MUST continue to Stage 9. The pipeline is NOT done.**
 
 ---
 
-## Stage 10: Test Verification
+## Stages 9-13: Review, Verify, Merge, Retrospective
 
-Follow the **Test Verification** procedure from pipeline-shared.
+**These stages run as subagents to ensure they execute with fresh context.**
 
-Gate: `TESTS_PASSED` required.
+### Stage 9-11: Code Review + Test Verification + Review Verdict
 
-**On TESTS_FAILED**: Retry once. If retry fails → **STOP PIPELINE**.
+Use the **Agent tool** to spawn a subagent with this prompt:
 
----
+> You are reviewing a pull request for a refactor. The project directory is `<project_path>`. The PR targets `<pr_target_branch>`.
+>
+> **Step 1 — Code Review**: Run `git diff <pr_target_branch>...HEAD` to see all changes. Read changed files for full context. Check for a project PR checklist at `docs/PULL_REQUEST_CHECKLIST.md` or `PULL_REQUEST_CHECKLIST.md` — if found, use it as the review framework. Review for: behavior preservation (refactor must not change functionality), correctness, security, testing gaps, code quality, documentation. Flag auto-reject triggers.
+>
+> **Step 2 — Test Verification**: Run the project test suite. Report pass/fail.
+>
+> **Step 3 — Review Verdict**: Synthesize findings. Output exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT.
 
-## Stage 11: Review Verdict
+- If `APPROVE` → proceed to Stage 12
+- If `REQUEST_CHANGES` → fix issues, re-commit, re-push, re-run subagent. Second failure → **STOP PIPELINE**.
 
-Follow the **Review Verdict** procedure from pipeline-shared.
+### Stage 12: Merge PR
 
-Output `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`.
+Use the **Agent tool** to spawn a subagent:
 
----
+> Approve and merge PR #`<pr_number>` in `<project_path>`.
+> 1. `gh pr review <pr_number> --approve --body 'Auto-approved: tests pass, review complete.'`
+> 2. `gh pr merge <pr_number> --squash --delete-branch`
+> 3. Output PR_MERGED or MERGE_FAILED.
 
-## Stage 12: Merge PR
+- If `PR_MERGED` → proceed to Stage 13
+- If `MERGE_FAILED` → retry once. Still failing → **STOP PIPELINE**.
 
-Follow the **Merge PR** procedure from pipeline-shared.
+### Stage 13: Retrospective
 
-Gate: `PR_MERGED` required.
+Use the **Agent tool** to spawn a subagent:
 
-**On MERGE_FAILED**: Retry once. If retry fails → **STOP PIPELINE**.
+> Review the pipeline execution for the refactor: `<task description>`. Project: `<project_path>`.
+> Run `git log --oneline <pr_target_branch>..HEAD`.
+> Rate quality (1-5), what went well, what could improve. Output IDEA: and TOOL: lines.
 
----
-
-## Stage 13: Retrospective
-
-Follow the **Retrospective** procedure from pipeline-shared. Use the Agent tool to run this as a subagent.
+**The pipeline is now complete.**
 
 ---
 

@@ -11,6 +11,8 @@ description: >
 
 These procedures are referenced by name from the pipeline-feature, pipeline-bugfix, and pipeline-refactor skills. Each procedure is a self-contained stage with its own quality gate.
 
+**CRITICAL: You MUST execute ALL stages in the pipeline, from first to last. Do NOT stop after Commit & PR. The Code Review, Test Verification, Review Verdict, Merge PR, and Retrospective stages are mandatory — they are not optional follow-ups. After creating a PR, immediately continue to Code Review.**
+
 ---
 
 ## Quality Gate Protocol
@@ -139,12 +141,14 @@ Scan files changed by this task for security vulnerabilities. Pre-existing issue
    — This is your **scope**. Only issues in these files can cause failure.
 
 2. **Scan changed files** for these patterns:
-   - `mark_safe` — Django XSS risk
-   - `@csrf_exempt` — CSRF protection disabled
-   - `|safe` — Django template XSS risk
+   - `mark_safe` — must use `escape()` or `format_html()` for interpolated values
+   - `@csrf_exempt` — CSRF protection disabled without justification
+   - `|safe` — template filter on user-controlled variables bypasses auto-escaping
    - Raw SQL queries (string interpolation in SQL)
    - Hardcoded secrets, API keys, passwords
    - `shell=True` — command injection risk
+   - String concatenation in JS contexts — must use `json.dumps()` for JS string escaping
+   - Unescaped user input in template tags
 
 3. **Broad codebase scan** (for context): grep the full codebase for the same patterns. Hits in files NOT in your scope are pre-existing — report as `IMPROVEMENT:` lines, do NOT let them influence your verdict.
 
@@ -221,23 +225,84 @@ Create a branch, commit changes, push, and create a pull request.
 
 Review the code changes in the current branch against the base branch.
 
+**IMPORTANT: This stage is mandatory. Do not skip it or stop the pipeline before reaching it.**
+
 ### Steps
 
 1. Run `git diff <pr_target_branch>...HEAD` to see all changes
 2. Read changed files for full context where needed
+3. **Check for a project PR checklist**: Look for `docs/PULL_REQUEST_CHECKLIST.md`, `PULL_REQUEST_CHECKLIST.md`, or `.github/PULL_REQUEST_TEMPLATE.md` in the project root. If found, use it as the primary review framework.
 
-Review for:
-- **Correctness**: Logic errors, edge cases, off-by-one errors
-- **Security**: Injection vulnerabilities, auth issues, secrets exposure
-- **Style**: Consistency with project conventions, readability
-- **Testing gaps**: New code paths without test coverage
-- **Performance**: Obvious inefficiencies, N+1 queries
-- **Architecture**: Design concerns, coupling, separation of concerns
+### Review Categories
+
+**Correctness**:
+- Logic errors, edge cases, off-by-one errors
+- Test-implementation alignment: tests actually import and exercise code in the diff
+- Import names match shipped code (no phantom modules or renamed APIs)
+- No placeholder/stub implementations (`return True`, hardcoded fake data, simulated APIs)
+- No comments indicating incomplete code ("simulate", "would be implemented", "for now")
+
+**Testing**:
+- New features have tests; bug fixes have regression tests
+- New JS feature files have corresponding test files
+- Tests are deterministic (no flaky tests)
+- All untracked files that tests depend on are included in the diff
+- Edge cases covered (error conditions, boundary cases)
+
+**Security**:
+- No `mark_safe()` with unescaped interpolated values — must use `escape()` or `format_html()`
+- No `|safe` template filter on user-controlled variables
+- No `@csrf_exempt` without documented justification
+- `json.dumps()` for values embedded in JavaScript strings (not HTML `escape()`)
+- No XSS, SQL injection, CSRF bypass, or secrets exposure
+- Template tags escape user input
+
+**Code Quality**:
+- No `print()` statements — use the project's logging system
+- No f-string formatting in logger calls — use `%s` style
+- No `console.log` in production JS without debug guards
+- No silent exception handling (`except: pass`)
+- Exception chaining (`raise X from e`)
+- Appropriate log levels (error/warning/info/debug)
+- `exc_info=True` for exception logging
+
+**Documentation**:
+- CHANGELOG.md updated for `feat:` and `fix:` PRs
+- Public APIs documented with docstrings
+- No internal tracking documents committed to repo
+- Breaking changes documented with migration path
+
+**Performance**:
+- No N+1 queries or unnecessary database hits
+- No memory leaks or excessive allocations
+- Caching for expensive operations where appropriate
+- VDOM/rendering impact considered (if applicable)
+
+**Architecture**:
+- Follows project patterns and conventions
+- Single responsibility — focused functions and classes
+- No code duplication — shared logic properly abstracted
+- `reinitAfterDOMUpdate()` after DOM replacement (if applicable)
+
+### Auto-Reject Triggers
+
+Flag as critical if any of these are found:
+- `print()` instead of logging
+- f-string in logger calls
+- Unguarded `console.log` in production JS
+- Silent exception handling (`except: pass`)
+- No tests for new functionality
+- Tests reference modules/APIs that don't exist in the diff
+- `mark_safe()` with unescaped interpolation
+- `|safe` on user-controlled variables
+- Placeholder/stub code shipped as production
+- Missing CHANGELOG.md update for feat/fix PRs
 
 For each finding, include: file and line number, severity (critical/warning/suggestion), description, suggested fix.
 
 ### Gate
 - Output `REVIEW_COMPLETE` — this stage always passes (informational)
+- Critical findings will be evaluated in the Review Verdict stage
 
 ---
 
@@ -259,11 +324,23 @@ Same as Test Execution — run the full test suite, report results.
 
 Synthesize all findings from Code Review and Test Verification into a final verdict.
 
+**IMPORTANT: This stage is mandatory. Do not skip it.**
+
+### Decision Logic
+
+- If any **auto-reject triggers** were found in Code Review → `REQUEST_CHANGES`
+- If tests failed in Test Verification → `REQUEST_CHANGES`
+- If only non-blocking suggestions → `APPROVE` or `COMMENT`
+- If `REQUEST_CHANGES`: go back and fix the critical issues before proceeding to Merge
+
 ### Output Structure
 
 ```
 ## Summary
 One-paragraph summary of the PR quality.
+
+## Checklist Compliance
+(list auto-reject items checked and their pass/fail status)
 
 ## Verdict
 APPROVE / REQUEST_CHANGES / COMMENT
@@ -279,6 +356,8 @@ APPROVE / REQUEST_CHANGES / COMMENT
 ```
 
 Output exactly one of: `APPROVE`, `REQUEST_CHANGES`, or `COMMENT` on its own line as the final verdict.
+
+If `REQUEST_CHANGES`: fix the issues, then re-evaluate. Only proceed to Merge PR when verdict is `APPROVE`.
 
 ---
 
