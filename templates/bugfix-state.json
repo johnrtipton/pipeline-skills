@@ -84,6 +84,7 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-diagnosis.md to understand what was fixed", "done": false},
         {"action": "discover project docs structure (read docs/README.md or index)", "done": false},
         {"action": "add/update docstrings for modified public APIs", "done": false},
         {"action": "update existing docs that reference changed behavior", "done": false},
@@ -111,10 +112,12 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "You are reviewing PR #{pr_number} for a bug fix. Project: {project_path}. PR targets {pr_target_branch}. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists. Review for correctness, security, testing (bug fix MUST have regression test), code quality, docs, perf. Flag auto-reject triggers. Step 2: Run project test suite, report pass/fail. Step 3: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 4 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review>'. If REQUEST_CHANGES use --request-changes instead. Save to pr/feedback/ if dir exists. Step 5: Output verdict.",
+      "subagent_prompt": "You are reviewing PR #{pr_number} for a bug fix. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-diagnosis.md for the original diagnosis. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists. Step 2: Cross-ref diagnosis vs fix — verify root cause was addressed, not just symptom. Step 3: Review for correctness, security, testing (bug fix MUST have regression test), code quality, docs, perf. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-diagnosis.md for diagnosis compliance check", "done": false},
         {"action": "git diff against target branch", "done": false},
         {"action": "load project PR checklist if exists (docs/PULL_REQUEST_CHECKLIST.md)", "done": false},
+        {"action": "cross-ref diagnosis vs fix — root cause addressed", "done": false, "mandatory": true},
         {"action": "verify regression test exists for the bug fix", "done": false, "mandatory": true},
         {"action": "review: correctness, security, testing, quality, docs, perf", "done": false},
         {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false},
