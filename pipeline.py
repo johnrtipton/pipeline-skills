@@ -353,10 +353,42 @@ def run_pipeline(state: dict):
         save_state(state)
 
 
+def parse_priority_matrix(lines: list[str]) -> dict[str, str]:
+    """Parse the Priority Matrix table to map feature names to priorities."""
+    priorities = {}
+    in_table = False
+    for line in lines:
+        if "Priority" in line and "Feature" in line and "Why" in line:
+            in_table = True
+            continue
+        if in_table and line.strip().startswith("|"):
+            cols = [c.strip() for c in line.split("|")]
+            if len(cols) >= 4:
+                # Extract priority — handle ~~**P0**~~ and **P1** formats
+                prio_cell = cols[1]
+                prio_match = re.search(r"P[0-3]", prio_cell)
+                if not prio_match:
+                    continue
+                priority = prio_match.group(0)
+                # Extract feature name — strip ~~, **, `, links
+                feature = cols[2]
+                completed = "✅" in feature or "~~" in feature
+                feature = feature.replace("~~", "").strip("* ")
+                feature = re.sub(r"`([^`]+)`", r"\1", feature)
+                feature = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", feature)
+                feature = feature.strip()
+                if feature:
+                    priorities[feature.lower()] = priority
+                    if completed:
+                        priorities[feature.lower() + ":done"] = True
+        elif in_table and not line.strip().startswith("|") and line.strip() != "":
+            in_table = False
+    return priorities
+
+
 def parse_roadmap(project: str, roadmap_path: str | None = None) -> list[dict]:
-    """Use Claude to parse ROADMAP.md into structured tasks."""
+    """Parse ROADMAP.md into structured tasks using markdown parsing."""
     if roadmap_path is None:
-        # Search common locations
         for candidate in ["ROADMAP.md", "docs/roadmap.md", "docs/ROADMAP.md"]:
             path = Path(project) / candidate
             if path.exists():
@@ -366,41 +398,141 @@ def parse_roadmap(project: str, roadmap_path: str | None = None) -> list[dict]:
         print(f"Error: ROADMAP.md not found in {project}")
         sys.exit(1)
 
-    prompt = f"""Read the file {roadmap_path} and extract all actionable tasks from the "Next Up" and "In Progress" sections.
+    with open(roadmap_path) as f:
+        content = f.read()
+    lines = content.split("\n")
 
-Output ONLY a JSON array, no other text. Each task object must have:
-- "milestone": the version string (e.g., "v0.4.0")
-- "milestone_title": the milestone title
-- "section": the section name within the milestone (e.g., "Critical Bug Fixes", "Quick Wins")
-- "name": the feature/task name (the bold text)
-- "priority": P0/P1/P2/P3 (check the Priority Matrix table at the top, default P2 if not listed)
-- "issue": GitHub issue number if present (integer or null)
-- "type": "bugfix" if section contains "Bug Fix" or description mentions fixing/broken/regression, else "feature"
-- "spec": the full description text from the ROADMAP (include everything from the bold name to the next bold name or section boundary)
+    # Parse priority matrix
+    priorities = parse_priority_matrix(lines)
 
-Skip:
-- Anything under "Completed" sections
-- Items marked with checkmarks or "Already implemented"
-- "Future (Post-1.0)", "Contributing", "Investigate & Decide", "Differentiators", "Parity Tracker" sections
+    # Sections to skip
+    skip_sections = {
+        "completed", "future", "post-1.0", "contributing", "investigate",
+        "differentiators", "parity tracker", "priority matrix",
+    }
 
-Output the JSON array and nothing else."""
+    tasks = []
+    current_milestone = None
+    current_milestone_title = None
+    current_section = None
+    in_skip = False
+    current_feature = None
+    current_spec_lines = []
 
-    output, exit_code = run_claude(prompt, project, max_turns=5)
+    def flush_feature():
+        nonlocal current_feature, current_spec_lines
+        if current_feature and current_milestone:
+            spec = "\n".join(current_spec_lines).strip()
+            # Detect type
+            section_lower = (current_section or "").lower()
+            spec_lower = spec.lower()
+            is_bugfix = (
+                "bug fix" in section_lower
+                or "fix" in current_feature.lower()[:20]
+                or any(w in spec_lower[:200] for w in ["fix:", "broken", "fails", "regression", "crash"])
+            )
+            # Extract issue number
+            issue = None
+            issue_match = re.search(r"\(#(\d+)\)", current_feature)
+            if issue_match:
+                issue = int(issue_match.group(1))
+            # Match priority — fuzzy match against priority matrix
+            feature_clean = re.sub(r"\s*\(#\d+\)", "", current_feature).strip()
+            prio = "P2"
+            # Normalize for matching: strip backticks, lowercase, remove extra whitespace
+            feature_norm = re.sub(r"`([^`]+)`", r"\1", feature_clean).lower().strip()
+            feature_norm = re.sub(r"\s+", " ", feature_norm)
+            # Try exact match first, then substring, then word overlap
+            for key, val in priorities.items():
+                if ":done" in key:
+                    continue
+                if key == feature_norm or feature_norm == key:
+                    prio = val
+                    break
+                # First significant words match (e.g., "js commands" matches "JS Commands (dj.push...)")
+                key_words = set(re.findall(r"\w{3,}", key))
+                feat_words = set(re.findall(r"\w{3,}", feature_norm))
+                if key_words and feat_words:
+                    overlap = key_words & feat_words
+                    if len(overlap) >= min(2, len(key_words)):
+                        prio = val
+                        break
 
-    # Extract JSON from output
-    try:
-        # Find the JSON array in the output
-        match = re.search(r"\[[\s\S]*\]", output)
-        if not match:
-            print("Error: Could not parse ROADMAP tasks from Claude output.")
-            print(f"Output: {output[:500]}")
-            sys.exit(1)
-        tasks = json.loads(match.group(0))
-        return tasks
-    except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON from roadmap parser: {e}")
-        print(f"Output: {output[:500]}")
-        sys.exit(1)
+            tasks.append({
+                "milestone": current_milestone,
+                "milestone_title": current_milestone_title,
+                "section": current_section,
+                "name": feature_clean,
+                "priority": prio,
+                "issue": issue,
+                "type": "bugfix" if is_bugfix else "feature",
+                "spec": spec,
+            })
+        current_feature = None
+        current_spec_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Detect h2 sections (## Completed, ## Next Up, etc.)
+        if stripped.startswith("## "):
+            flush_feature()
+            heading = stripped[3:].strip().lower()
+            in_skip = any(s in heading for s in skip_sections)
+            continue
+
+        if in_skip:
+            continue
+
+        # Detect milestones (### Milestone: v0.4.0 — Title)
+        milestone_match = re.match(r"###\s+Milestone:\s+(v[\d.]+)\s*[—–-]\s*(.*)", stripped)
+        if milestone_match:
+            flush_feature()
+            current_milestone = milestone_match.group(1)
+            current_milestone_title = milestone_match.group(2).strip()
+            current_section = None
+            continue
+
+        # Also handle "### Stability & Correctness" style (In Progress section)
+        if stripped.startswith("### ") and not stripped.startswith("### Milestone"):
+            flush_feature()
+            current_section = stripped[4:].strip()
+            continue
+
+        # Detect sections (#### Quick Wins, #### Critical Bug Fixes)
+        if stripped.startswith("#### "):
+            flush_feature()
+            current_section = stripped[5:].strip()
+            continue
+
+        # Detect features (**Feature Name** — description)
+        feature_match = re.match(r"\*\*(.+?)\*\*", stripped)
+        if feature_match and current_milestone:
+            flush_feature()
+            current_feature = feature_match.group(1)
+            # Skip already-completed items
+            if "✅" in stripped or "already implemented" in stripped.lower():
+                current_feature = None
+                continue
+            # Skip non-feature lines (milestone goals, etc.)
+            if current_feature.lower() in ("goal", "scope"):
+                current_feature = None
+                continue
+            # Skip if marked done in priority matrix
+            feature_check = re.sub(r"`([^`]+)`", r"\1", current_feature).lower().strip()
+            feature_check = re.sub(r"\s*\(#\d+\)", "", feature_check)
+            if priorities.get(feature_check + ":done"):
+                current_feature = None
+                continue
+            current_spec_lines = [stripped]
+            continue
+
+        # Accumulate spec lines
+        if current_feature:
+            current_spec_lines.append(line)
+
+    flush_feature()
+    return tasks
 
 
 def filter_tasks(tasks: list[dict], milestone: str | None, priority: str | None,
@@ -425,7 +557,7 @@ def filter_tasks(tasks: list[dict], milestone: str | None, priority: str | None,
     priority_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
     filtered.sort(key=lambda t: (
         priority_order.get(t.get("priority", "P2"), 2),
-        0 if "bug" in t.get("section", "").lower() else 1,
+        0 if "bug" in (t.get("section") or "").lower() else 1,
     ))
 
     return filtered
