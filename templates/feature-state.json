@@ -49,7 +49,8 @@
         {"action": "list files to create/modify", "done": false},
         {"action": "key design decisions", "done": false},
         {"action": "test strategy", "done": false},
-        {"action": "potential risks", "done": false}
+        {"action": "potential risks", "done": false},
+        {"action": "write plan to .pipeline-state/<branch>-plan.md so later stages can read it", "done": false, "mandatory": true}
       ]
     },
     "5": {
@@ -81,6 +82,7 @@
       "verdict": null,
       "skip_if": "DOCS_ONLY",
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-plan.md for the original plan", "done": false},
         {"action": "cross-ref plan vs implementation — mark each deliverable DONE/MISSING", "done": false},
         {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false, "mandatory": true},
         {"action": "test coverage gaps", "done": false},

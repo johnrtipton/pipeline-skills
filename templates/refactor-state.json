@@ -40,7 +40,8 @@
         {"action": "code smells and issues", "done": false},
         {"action": "proposed refactoring approach (step by step)", "done": false},
         {"action": "list all files affected", "done": false},
-        {"action": "risk assessment", "done": false}
+        {"action": "risk assessment", "done": false},
+        {"action": "write analysis to .pipeline-state/<branch>-analysis.md so later stages can read it", "done": false, "mandatory": true}
       ]
     },
     "4": {
@@ -70,6 +71,7 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-analysis.md for the original analysis", "done": false},
         {"action": "cross-ref analysis plan vs refactoring — flag unimplemented changes", "done": false},
         {"action": "verify behavior preserved", "done": false, "mandatory": true},
         {"action": "no dead code left behind", "done": false},

@@ -40,7 +40,8 @@
         {"action": "search codebase for relevant code paths", "done": false},
         {"action": "identify root cause (not just symptom)", "done": false, "mandatory": true},
         {"action": "propose targeted fix", "done": false},
-        {"action": "scope check — output SCOPE_EXPANDED if broader than spec", "done": false}
+        {"action": "scope check — output SCOPE_EXPANDED if broader than spec", "done": false},
+        {"action": "write diagnosis to .pipeline-state/<branch>-diagnosis.md so later stages can read it", "done": false, "mandatory": true}
       ]
     },
     "4": {
@@ -69,6 +70,7 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "read .pipeline-state/<branch>-diagnosis.md for the original diagnosis", "done": false},
         {"action": "verify root cause addressed (not just symptom)", "done": false, "mandatory": true},
         {"action": "cross-ref diagnosis vs fix — flag if fix diverged", "done": false},
         {"action": "check no related functionality broken", "done": false},
