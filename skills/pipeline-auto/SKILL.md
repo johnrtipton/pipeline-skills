@@ -100,12 +100,15 @@ Apply filters from the user's arguments:
 | `--priority <P0-P3>` | Only tasks at this priority level |
 | `--feature "<keyword>"` | Fuzzy match feature name or description |
 | `--all` | Process all matching tasks sequentially (default: just the first one) |
+| `--resume` | Resume the most recent incomplete pipeline (reads `.pipeline-state/`) |
 | No filters | Pick the highest-priority unprocessed task from the first "Next Up" milestone |
 
 ### Task Selection Order (when multiple tasks match)
 1. P0 before P1 before P2 before P3
 2. Within same priority: "Critical Bug Fixes" section first, then other sections in document order
-3. Skip tasks that already have a branch with commits (check `git branch -a | grep <slug>`)
+3. **Resume detection**: Check `.pipeline-state/` for state files matching task branch names. If a state file exists with incomplete stages, that task should be **resumed first** (not skipped). A task is only skipped if its pipeline state shows all stages completed, OR if it has a merged PR.
+4. Skip tasks that have a merged PR (check `gh pr list --state merged --head <branch>`)
+5. Tasks with an open PR but incomplete review stages should be resumed at the review stage
 
 ---
 
@@ -163,6 +166,8 @@ Compose a complete task spec from the ROADMAP entry:
 
 ### 4c. Run Pipeline
 
+**Check for existing state first**: Read `.pipeline-state/<branch-name>.json`. If it exists with incomplete stages, the pipeline-feature/pipeline-bugfix procedure will automatically resume from the last incomplete stage (see Pipeline State File in pipeline-shared).
+
 Based on the task type:
 - **bugfix**: Follow the full pipeline-bugfix procedure (all 13 stages)
 - **feature**: Follow the full pipeline-feature procedure (all 15 stages)
@@ -172,6 +177,11 @@ Based on the task type:
 - Branch name follows the task slug
 - If a GitHub issue number exists, link it in the PR
 - Commit message must reference the milestone: `feat(v0.4.0): <description>`
+
+**Resume shortcut**: If `--resume` is passed, skip ROADMAP parsing. Instead:
+1. Find the most recent `.pipeline-state/*.json` file
+2. Read it for pipeline type, branch name, task description, and current stage
+3. Checkout the branch and run the appropriate pipeline skill — it will auto-resume from the state file
 
 ### 4d. Record Progress
 
