@@ -62,6 +62,10 @@
         {"action": "write tests first (TDD)", "done": false},
         {"action": "implement to pass tests", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
+        {"action": "dual-path wiring: if feature touches lifecycle/mount/events, wire into BOTH websocket.py (WebSocket) AND mixins/request.py (HTTP)", "done": false, "mandatory": true},
+        {"action": "mixin wiring: if new mixin, verify MRO + __init__.py export + consumer hooks + client JS routing + HTTP path", "done": false},
+        {"action": "update CHANGELOG.md with feat: entry", "done": false, "mandatory": true},
+        {"action": "add system check tests if new check codes introduced", "done": false},
         {"action": "git add -u + new files", "done": false},
         {"action": "git status clean", "done": false, "mandatory": true},
         {"action": "write list of all changed files to .pipeline-state/<branch>-changes.txt (git diff --name-only HEAD)", "done": false, "mandatory": true}
