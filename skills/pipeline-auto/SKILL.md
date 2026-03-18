@@ -164,13 +164,28 @@ Compose a complete task spec from the ROADMAP entry:
 - Branch: <task branch> → PR targets dev/<milestone>
 ```
 
-### 4c. Run Pipeline
+### 4c. Initialize State File (BEFORE running pipeline)
 
-**Check for existing state first**: Read `.pipeline-state/<branch-name>.json`. If it exists with incomplete stages, the pipeline-feature/pipeline-bugfix procedure will automatically resume from the last incomplete stage (see Pipeline State File in pipeline-shared).
+**This must happen BEFORE starting any pipeline stages.** Create the state file immediately after announcing the task:
+
+```bash
+mkdir -p .pipeline-state
+```
+
+1. If `.pipeline-state/<branch-name>.json` already exists → this is a **resume**. Read it, find the first non-`passed` stage, and skip to that stage.
+2. If no state file exists → copy the appropriate template:
+   - Bugfix: use the bugfix-state.json template structure
+   - Feature: use the feature-state.json template structure
+3. Fill in: `task_description`, `branch_name`, `pr_target_branch` (= `dev/<milestone>`), `project_path`, `started_at`
+4. **Write it to `.pipeline-state/<branch-name>.json` NOW** — before running any stages
+
+### 4d. Run Pipeline
 
 Based on the task type:
 - **bugfix**: Follow the full pipeline-bugfix procedure (all 13 stages)
 - **feature**: Follow the full pipeline-feature procedure (all 15 stages)
+
+**After EVERY stage**: Update the state file — set stage status, verdict, checklist items. This is defined in the Quality Gate Protocol in pipeline-shared.
 
 **Critical overrides for automated mode:**
 - PR target branch is `dev/<milestone>` (NOT `main`)
@@ -183,7 +198,7 @@ Based on the task type:
 2. Read it for pipeline type, branch name, task description, and current stage
 3. Checkout the branch and run the appropriate pipeline skill — it will auto-resume from the state file
 
-### 4d. Record Progress
+### 4e. Record Progress
 
 After each task completes (success or failure):
 
