@@ -20,6 +20,11 @@ Usage:
 
     # Override target branch (for milestone dev branches)
     python pipeline.py bugfix --task "..." --project ~/path --target-branch dev/v0.4.0
+
+    # Auto mode — parse ROADMAP.md and process tasks
+    python pipeline.py auto --project ~/path --milestone v0.4.0 --priority P0
+    python pipeline.py auto --project ~/path --milestone v0.4.0 --all
+    python pipeline.py auto --project ~/path --list --milestone v0.4.0
 """
 
 import argparse
@@ -348,11 +353,256 @@ def run_pipeline(state: dict):
         save_state(state)
 
 
+def parse_roadmap(project: str, roadmap_path: str | None = None) -> list[dict]:
+    """Use Claude to parse ROADMAP.md into structured tasks."""
+    if roadmap_path is None:
+        # Search common locations
+        for candidate in ["ROADMAP.md", "docs/roadmap.md", "docs/ROADMAP.md"]:
+            path = Path(project) / candidate
+            if path.exists():
+                roadmap_path = str(path)
+                break
+    if not roadmap_path or not Path(roadmap_path).exists():
+        print(f"Error: ROADMAP.md not found in {project}")
+        sys.exit(1)
+
+    prompt = f"""Read the file {roadmap_path} and extract all actionable tasks from the "Next Up" and "In Progress" sections.
+
+Output ONLY a JSON array, no other text. Each task object must have:
+- "milestone": the version string (e.g., "v0.4.0")
+- "milestone_title": the milestone title
+- "section": the section name within the milestone (e.g., "Critical Bug Fixes", "Quick Wins")
+- "name": the feature/task name (the bold text)
+- "priority": P0/P1/P2/P3 (check the Priority Matrix table at the top, default P2 if not listed)
+- "issue": GitHub issue number if present (integer or null)
+- "type": "bugfix" if section contains "Bug Fix" or description mentions fixing/broken/regression, else "feature"
+- "spec": the full description text from the ROADMAP (include everything from the bold name to the next bold name or section boundary)
+
+Skip:
+- Anything under "Completed" sections
+- Items marked with checkmarks or "Already implemented"
+- "Future (Post-1.0)", "Contributing", "Investigate & Decide", "Differentiators", "Parity Tracker" sections
+
+Output the JSON array and nothing else."""
+
+    output, exit_code = run_claude(prompt, project, max_turns=5)
+
+    # Extract JSON from output
+    try:
+        # Find the JSON array in the output
+        match = re.search(r"\[[\s\S]*\]", output)
+        if not match:
+            print("Error: Could not parse ROADMAP tasks from Claude output.")
+            print(f"Output: {output[:500]}")
+            sys.exit(1)
+        tasks = json.loads(match.group(0))
+        return tasks
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON from roadmap parser: {e}")
+        print(f"Output: {output[:500]}")
+        sys.exit(1)
+
+
+def filter_tasks(tasks: list[dict], milestone: str | None, priority: str | None,
+                 feature: str | None) -> list[dict]:
+    """Filter and sort tasks by milestone, priority, and feature keyword."""
+    filtered = tasks
+
+    if milestone:
+        filtered = [t for t in filtered if t.get("milestone") == milestone]
+
+    if priority:
+        filtered = [t for t in filtered if t.get("priority") == priority]
+
+    if feature:
+        kw = feature.lower()
+        filtered = [t for t in filtered
+                    if kw in t.get("name", "").lower()
+                    or kw in t.get("spec", "").lower()
+                    or kw in t.get("section", "").lower()]
+
+    # Sort: P0 first, then by section priority (Bug Fixes first), then document order
+    priority_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+    filtered.sort(key=lambda t: (
+        priority_order.get(t.get("priority", "P2"), 2),
+        0 if "bug" in t.get("section", "").lower() else 1,
+    ))
+
+    return filtered
+
+
+def is_task_done(project: str, task: dict) -> tuple[bool, str]:
+    """Check if a task is already done (has merged PR or completed state)."""
+    prefix = "fix" if task.get("type") == "bugfix" else "feat"
+    branch = f"{prefix}/{slugify(task['name'])}"
+
+    # Check for completed state file
+    sp = state_path(project, branch)
+    if sp.exists():
+        state = load_state(sp)
+        if state.get("completed_at"):
+            return True, f"completed (state file)"
+        # Incomplete state — needs resume, not skip
+        return False, f"incomplete (stage {state.get('current_stage', '?')})"
+
+    # Check for merged PR
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "list", "--state", "merged", "--head", branch, "--json", "number,title", "--limit", "1"],
+            cwd=project, capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            prs = json.loads(result.stdout)
+            if prs:
+                return True, f"merged PR #{prs[0]['number']}"
+    except (subprocess.TimeoutExpired, json.JSONDecodeError):
+        pass
+
+    # Check for existing branch with commits
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--list", branch],
+            cwd=project, capture_output=True, text=True, timeout=5,
+        )
+        if result.stdout.strip():
+            # Branch exists — check if it has a merged PR
+            return False, "branch exists (no merged PR)"
+    except subprocess.TimeoutExpired:
+        pass
+
+    return False, "not started"
+
+
+def run_auto(project: str, roadmap: str | None, milestone: str | None,
+             priority: str | None, feature: str | None, process_all: bool,
+             list_only: bool):
+    """Parse ROADMAP and process tasks through pipelines."""
+    project = os.path.abspath(project)
+
+    print(f"{'═' * 60}")
+    print(f"  Pipeline Auto — Parsing ROADMAP")
+    print(f"{'═' * 60}\n")
+
+    tasks = parse_roadmap(project, roadmap)
+    print(f"  Found {len(tasks)} tasks in ROADMAP\n")
+
+    filtered = filter_tasks(tasks, milestone, priority, feature)
+    if not filtered:
+        print("  No tasks match the filters.")
+        return
+
+    # Determine target branch
+    target_branch = f"dev/{milestone}" if milestone else "main"
+
+    # Check status of each task
+    print(f"{'═' * 60}")
+    title = f"  {milestone or 'All'} Tasks"
+    if priority:
+        title += f" (Priority: {priority})"
+    print(title)
+    print(f"{'═' * 60}\n")
+
+    actionable = []
+    for task in filtered:
+        done, status = is_task_done(project, task)
+        marker = "✅" if done else "⬜"
+        issue_str = f" (#{task['issue']})" if task.get("issue") else ""
+        print(f"  {marker} [{task.get('priority', '??')}] {task['name']}{issue_str} — {status}")
+        if not done:
+            actionable.append(task)
+
+    print(f"\n  {len(filtered) - len(actionable)} done, {len(actionable)} remaining\n")
+
+    if list_only:
+        return
+
+    if not actionable:
+        print("  All tasks are complete!")
+        return
+
+    # Process tasks
+    to_process = actionable if process_all else actionable[:1]
+
+    if process_all and len(to_process) > 3:
+        print(f"  ⚠️  About to process {len(to_process)} tasks. Ctrl+C to cancel.\n")
+
+    results = {"succeeded": [], "failed": [], "skipped": []}
+
+    for i, task in enumerate(to_process, 1):
+        print(f"\n{'═' * 60}")
+        print(f"  Processing {i}/{len(to_process)}: {task['name']}")
+        print(f"  Milestone: {task.get('milestone', '?')} | Priority: {task.get('priority', '?')}")
+        print(f"  Type: {task.get('type', 'feature')} | Issue: #{task.get('issue', 'none')}")
+        print(f"{'═' * 60}")
+
+        pipeline_type = task.get("type", "feature")
+        task_desc = task.get("spec") or task.get("name")
+
+        # Check for incomplete state (resume)
+        prefix = "fix" if pipeline_type == "bugfix" else "feat"
+        branch = f"{prefix}/{slugify(task['name'])}"
+        sp = state_path(project, branch)
+
+        if sp.exists():
+            state = load_state(sp)
+            if state.get("completed_at") is None:
+                print(f"  Resuming from stage {state.get('current_stage', 1)}")
+                try:
+                    run_pipeline(state)
+                    results["succeeded"].append(task)
+                except SystemExit:
+                    results["failed"].append(task)
+                continue
+
+        # New pipeline
+        state = init_state(pipeline_type, task_desc, project, target_branch)
+        # Override branch name to include issue number if present
+        if task.get("issue"):
+            state["branch_name"] = f"{prefix}/{slugify(task['name'])}-{task['issue']}"
+
+        try:
+            run_pipeline(state)
+            results["succeeded"].append(task)
+        except SystemExit:
+            results["failed"].append(task)
+
+    # Summary
+    print(f"\n{'═' * 60}")
+    print(f"  Pipeline Auto Complete")
+    print(f"{'═' * 60}")
+    print(f"  Milestone: {milestone or 'all'}")
+    print(f"  Tasks processed: {len(to_process)}")
+    print(f"  Succeeded: {len(results['succeeded'])}")
+    print(f"  Failed: {len(results['failed'])}")
+    if results["failed"]:
+        for t in results["failed"]:
+            print(f"    ❌ {t['name']}")
+    print(f"  Dev branch: {target_branch}")
+    print(f"{'═' * 60}\n")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Pipeline runner for Claude Code")
-    parser.add_argument("type", nargs="?", choices=["feature", "bugfix", "refactor"],
-                        help="Pipeline type")
-    parser.add_argument("--task", "-t", help="Task description")
+    parser = argparse.ArgumentParser(
+        description="Pipeline runner for Claude Code",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Single pipeline
+  python pipeline.py bugfix --task "Fix event sequencing #560" --project ~/djust
+  python pipeline.py feature --task "Add dj-value-*" --project ~/djust -b dev/v0.4.0
+
+  # Auto mode (ROADMAP-driven)
+  python pipeline.py auto --project ~/djust --milestone v0.4.0 --priority P0
+  python pipeline.py auto --project ~/djust --milestone v0.4.0 --all
+  python pipeline.py auto --project ~/djust --list --milestone v0.4.0
+
+  # Resume
+  python pipeline.py --resume --project ~/djust
+        """,
+    )
+    parser.add_argument("type", nargs="?", choices=["feature", "bugfix", "refactor", "auto"],
+                        help="Pipeline type or 'auto' for ROADMAP-driven mode")
+    parser.add_argument("--task", "-t", help="Task description (for single pipeline)")
     parser.add_argument("--project", "-p", default=".", help="Project directory")
     parser.add_argument("--target-branch", "-b", default="main",
                         help="PR target branch (default: main)")
@@ -360,9 +610,29 @@ def main():
                         help="Resume most recent incomplete pipeline")
     parser.add_argument("--state", "-s", help="Resume from specific state file")
     parser.add_argument("--list", "-l", action="store_true",
-                        help="List pipeline state and exit")
+                        help="List pipeline state / roadmap tasks and exit")
+    # Auto mode options
+    parser.add_argument("--milestone", "-m", help="Filter by milestone (e.g., v0.4.0)")
+    parser.add_argument("--priority", help="Filter by priority (P0/P1/P2/P3)")
+    parser.add_argument("--feature", "-f", help="Filter by feature name/keyword")
+    parser.add_argument("--all", dest="process_all", action="store_true",
+                        help="Process all matching tasks (default: just the first)")
+    parser.add_argument("--roadmap", help="Path to ROADMAP.md (auto-detected if not specified)")
 
     args = parser.parse_args()
+
+    # Auto mode
+    if args.type == "auto":
+        run_auto(
+            project=args.project,
+            roadmap=args.roadmap,
+            milestone=args.milestone,
+            priority=args.priority,
+            feature=args.feature,
+            process_all=args.process_all,
+            list_only=args.list,
+        )
+        return
 
     # Resume mode
     if args.resume or args.state:
@@ -384,7 +654,7 @@ def main():
         run_pipeline(state)
         return
 
-    # List mode
+    # List mode (non-auto)
     if args.list:
         state_dir = Path(args.project) / ".pipeline-state"
         if not state_dir.exists():
@@ -397,9 +667,12 @@ def main():
             print(f"  {f.name}: {state['pipeline_type']} — {status}")
         return
 
-    # New pipeline
+    # New single pipeline
     if not args.type or not args.task:
-        parser.error("Pipeline type and --task are required (or use --resume)")
+        parser.error("Pipeline type and --task are required (or use 'auto' or --resume)")
+
+    if args.type not in ("feature", "bugfix", "refactor"):
+        parser.error(f"Unknown pipeline type: {args.type}")
 
     state = init_state(args.type, args.task, args.project, args.target_branch)
 
