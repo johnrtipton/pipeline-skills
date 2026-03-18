@@ -235,10 +235,10 @@ Collect the subagent's output.
 Use the **Agent tool** to spawn a subagent with this prompt:
 
 > Approve and merge PR #`<pr_number>` in `<project_path>`.
-> 1. Run: `gh pr review <pr_number> --approve --body 'Automated review passed: tests pass, no auto-reject triggers, checklist clean.'`
-> 2. Run: `gh pr merge <pr_number> --squash --delete-branch`
-> 3. If merge succeeds, output: PR_MERGED
-> 4. If merge fails, output: MERGE_FAILED followed by error details.
+> 1. Run: `gh pr merge <pr_number> --squash --delete-branch`
+>    Do NOT run `gh pr review --approve` — GitHub blocks self-approval on PRs you authored. The review comment posted earlier serves as the review record.
+> 2. If merge succeeds, output: PR_MERGED
+> 3. If merge fails, output: MERGE_FAILED followed by error details.
 
 Collect the subagent's output.
 

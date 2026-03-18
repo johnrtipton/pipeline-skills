@@ -169,9 +169,9 @@ Use the **Agent tool** to spawn a subagent with this prompt:
 Use the **Agent tool** to spawn a subagent:
 
 > Approve and merge PR #`<pr_number>` in `<project_path>`.
-> 1. `gh pr review <pr_number> --approve --body 'Automated review passed: tests pass, no auto-reject triggers, checklist clean.'`
-> 2. `gh pr merge <pr_number> --squash --delete-branch`
-> 3. Output PR_MERGED or MERGE_FAILED.
+> 1. `gh pr merge <pr_number> --squash --delete-branch`
+>    Do NOT run `gh pr review --approve` — GitHub blocks self-approval.
+> 2. Output PR_MERGED or MERGE_FAILED.
 
 - If `PR_MERGED` → proceed to Stage 13
 - If `MERGE_FAILED` → retry once. Still failing → **STOP PIPELINE**.
