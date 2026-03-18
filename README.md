@@ -9,6 +9,7 @@ Development pipeline skills that turn Claude Code into a self-orchestrating deve
 | **pipeline-feature** | `/pipeline-feature <task>` | Full feature implementation: planning, TDD, test, self-review, security, docs, commit & PR, code review, merge |
 | **pipeline-bugfix** | `/pipeline-bugfix <bug report>` | Bug fix: diagnosis, targeted fix, regression check, test, docs, commit & PR, code review, merge |
 | **pipeline-refactor** | `/pipeline-refactor <description>` | Refactor: analysis, behavior-preserving execution, review, test, docs, commit & PR, code review, merge |
+| **pipeline-auto** | `/pipeline-auto [options]` | Automated: parse ROADMAP.md, select tasks by priority/milestone, process them through pipelines into a dev branch |
 | **pipeline-shared** | *(reference only)* | Shared procedures used by all pipeline skills — not invoked directly |
 
 ## Installation
@@ -50,6 +51,26 @@ Unlike subprocess-based orchestrators that lose context between stages, these sk
 ### Independent Evaluation
 
 Security Check and Retrospective run as subagents (via Claude Code's Agent tool) for independent evaluation with clean context — preventing bias from the implementation session.
+
+## Automated Roadmap Processing
+
+The `pipeline-auto` skill reads a project's ROADMAP.md, extracts tasks by milestone and priority, and processes them sequentially through the appropriate pipeline skill. All work lands on a `dev/<milestone>` branch.
+
+```bash
+# List tasks in a milestone
+/pipeline-auto --list --milestone v0.4.0
+
+# Process the next P0 task
+/pipeline-auto --milestone v0.4.0 --priority P0
+
+# Process a specific feature
+/pipeline-auto --feature "dj-value-*"
+
+# Process all tasks in a milestone
+/pipeline-auto --milestone v0.4.0 --all
+```
+
+Progress is tracked in `.pipeline-status.md` in the project root. Tasks that fail are skipped (with a report) and the next task is processed.
 
 ## Customization
 
