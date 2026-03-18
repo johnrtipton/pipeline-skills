@@ -11,8 +11,17 @@ description: >
 
 This skill is a tiny loop. The state file is the program. You are the executor.
 
-**Usage**: `/pipeline-run` — finds the most recent incomplete state file and starts executing
-**Usage**: `/pipeline-run fix-event-sequencing-560` — run a specific pipeline by branch name
+**Usage**:
+- `/pipeline-run` — resume most recent incomplete pipeline
+- `/pipeline-run fix-event-sequencing-560` — run a specific pipeline by branch name
+- `/pipeline-run --milestone v0.4.0` — pick next task from ROADMAP and run it (calls /pipeline-next automatically)
+- `/pipeline-run --milestone v0.4.0 --priority P1` — pick next P1 task and run it
+
+## Before the Loop
+
+If no state file exists (no `.pipeline-state/*.json` with `completed_at` = null):
+1. If `--milestone` or `--priority` or `--feature` was specified, run the **pipeline-next** procedure: read ROADMAP.md, pick the next matching task, create the state file from the appropriate template.
+2. If no flags specified, tell the user: "No incomplete pipeline found. Run `/pipeline-run --milestone v0.4.0` to pick a task from the roadmap."
 
 ## The Loop
 
