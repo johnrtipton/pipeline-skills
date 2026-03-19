@@ -14,8 +14,10 @@ This skill is a tiny loop. The state file is the program. You are the executor.
 **Usage**:
 - `/pipeline-run` — resume most recent incomplete pipeline
 - `/pipeline-run fix-event-sequencing-560` — run a specific pipeline by branch name
-- `/pipeline-run --milestone v0.4.0` — pick next task from ROADMAP and run it (calls /pipeline-next automatically)
+- `/pipeline-run --milestone v0.4.0` — pick next task from ROADMAP and run it
 - `/pipeline-run --milestone v0.4.0 --priority P1` — pick next P1 task and run it
+- `/pipeline-run --milestone v0.4.0 --all` — **process ALL remaining tasks** in the milestone sequentially
+- `/pipeline-run --milestone v0.4.0 --priority P1 --all` — process all remaining P1 tasks
 
 ## Before the Loop
 
@@ -156,6 +158,34 @@ When all stages are passed/skipped:
   Branch: <branch>
   PR: #<number> — <url>
   Stages: <passed> passed, <skipped> skipped
+═══════════════════════════════════════════
+```
+
+## After Completion — Continue to Next Task (--all mode)
+
+If `--all` was specified with `--milestone` (and optionally `--priority`):
+
+1. After the current pipeline completes, **run pipeline-next again** with the same milestone/priority filters
+2. If pipeline-next finds another task → create state file, start the stage loop again
+3. If no more tasks match → print the milestone summary and stop
+
+This is the **outer loop**:
+```
+while true:
+    1. Run pipeline-next with filters → picks task, creates state file
+    2. If no task found → break (all done)
+    3. Run the stage loop (inner loop) → completes all stages
+    4. Print task summary
+    5. Go to 1
+```
+
+Print a milestone summary when all tasks are done:
+```
+═══════════════════════════════════════════
+  Milestone Complete: v0.4.0
+  Tasks processed: 4
+  Succeeded: 3 (PRs: #571, #572, #573)
+  Failed: 1 (transition/priority — TESTS_FAILED)
 ═══════════════════════════════════════════
 ```
 
