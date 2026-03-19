@@ -1,9 +1,10 @@
 ---
 name: pipeline-next
 description: >
-  Pick the next task from ROADMAP.md and set up a pipeline state file.
-  Reads the roadmap, filters by milestone/priority, checks what's already
-  done, and creates .pipeline-state/<branch>.json from the template.
+  Pick the next task (or group of related tasks) from ROADMAP.md and set up
+  a pipeline state file. Reads the roadmap, filters by milestone/priority,
+  groups related small features into batches, checks what's already done,
+  and creates .pipeline-state/<branch>.json from the template.
   Run /pipeline-run after this to execute the stages.
 ---
 
@@ -17,6 +18,8 @@ Pick the next task from the project's ROADMAP.md and create a pipeline state fil
 - `/pipeline-next --milestone v0.4.0 --priority P1` — next P1 task
 - `/pipeline-next --feature "dj-value"` — specific feature by keyword
 - `/pipeline-next --list` — list available tasks without starting
+- `/pipeline-next --milestone v0.4.0 --group` — auto-group remaining tasks and pick next group
+- `/pipeline-next --milestone v0.4.0 --list --group` — show proposed groups without starting
 
 ## Steps
 
@@ -45,11 +48,40 @@ For each matching task, check:
 - `gh pr list --state merged --head <branch>` finds a merged PR → done
 - `.pipeline-state/<branch>.json` exists without `completed_at` → **resume this one**
 
-Print status of all matching tasks. Pick the first one that's not done.
+Print status of all matching tasks.
 
-### 6. Create the state file
+### 6. Group related tasks (--group mode)
 
-This is the critical step. Read the template file DIRECTLY — do not search for it:
+If `--group` is specified, analyze the remaining (not-done) tasks and group them by relatedness. Tasks should be grouped when they:
+
+- **Touch the same files** — e.g., multiple `dj-*` attributes all modify `03-event-binding.js`
+- **Share a pattern** — e.g., all "add HTML attribute" features follow the same implementation pattern
+- **Are small and related** — e.g., multiple CSS class toggles, multiple client-side-only features
+- **Belong to the same ROADMAP section** — e.g., all under "Quick Wins"
+
+**Grouping rules:**
+- Each group should have a clear theme name (e.g., "Event attributes", "UI feedback attributes")
+- Max ~5-6 tasks per group (keeps the implementation manageable)
+- Large/complex tasks (like "Transition/priority updates") stay solo
+- Bug fixes are never grouped with features
+
+**Suggested groupings for typical djust v0.4.0 quick wins:**
+
+| Group | Tasks | Theme |
+|---|---|---|
+| Event attributes | `_target` param, `dj-disable-with`, `dj-lock`, `dj-mounted` | Event handling in client JS |
+| Scoping attributes | Window/document scoping, `dj-click-away`, `dj-shortcut` | Window/document event binding |
+| UI feedback | `dj-cloak`, `dj-page-loading`, Connection state CSS, `dj-scroll-into-view` | CSS class state management |
+| Utility attributes | `dj-copy`, `dj-auto-recover`, `dj-debounce`/`dj-throttle` HTML | Small standalone client features |
+| Document metadata | `live_title` & document metadata | Server + client metadata |
+| Reconnection | Form recovery, Reconnection backoff with jitter | WebSocket reconnection path |
+| Dev tooling | Error messages, `djust_doctor`, Latency simulator | Developer experience |
+
+Print the proposed groups with `--list --group`. Without `--list`, pick the highest-priority group.
+
+### 7. Create the state file
+
+Read the template file DIRECTLY:
 
 ```bash
 # For features:
@@ -60,18 +92,36 @@ cat ~/online_projects/ai/pipeline-skill/templates/bugfix-state.json
 cat ~/online_projects/ai/pipeline-skill/templates/refactor-state.json
 ```
 
-Copy it, fill in:
-- `task_description`: the full ROADMAP spec
-- `branch_name`: `fix/<slug>` or `feat/<slug>`
-- `pr_target_branch`: `dev/<milestone>` if milestone specified, else project default
-- `project_path`: current working directory
-- `started_at`: current ISO 8601 timestamp
+**For a single task:** Copy template, fill in task_description, branch_name, etc.
+
+**For a group (--group mode):** Copy the feature template, then:
+- `task_description`: Include ALL tasks in the group with their specs:
+  ```
+  ## Batch: <group theme>
+
+  Implement these related features as a single PR:
+
+  ### 1. <task name>
+  <spec from ROADMAP>
+
+  ### 2. <task name>
+  <spec from ROADMAP>
+  ...
+  ```
+- `branch_name`: `feat/<group-slug>` (e.g., `feat/event-attributes`, `feat/ui-feedback-attrs`)
+- The Planning stage will plan all tasks together
+- The Implementation stage will implement all tasks in sequence
+- One PR covers the entire group
+- Add a `"batch_tasks"` field to the state file listing the individual task names:
+  ```json
+  "batch_tasks": ["_target param", "dj-disable-with", "dj-lock", "dj-mounted"]
+  ```
 
 Write to `.pipeline-state/<branch-name>.json`. Ensure `.pipeline-state/` is in `.gitignore`.
 
-### 7. Output
+### 8. Output
 
-Print:
+**Single task:**
 ```
 ═══════════════════════════════════════════
   Task selected: <name>
@@ -79,7 +129,21 @@ Print:
   Branch: <branch-name>
   State: .pipeline-state/<file>.json
   Stages: <N> (from template)
+═══════════════════════════════════════════
+```
 
-  Run /pipeline-run to start executing stages.
+**Batch group:**
+```
+═══════════════════════════════════════════
+  Group selected: <group theme>
+  Tasks: <count> features
+  Branch: feat/<group-slug>
+  State: .pipeline-state/<file>.json
+  Stages: <N> (from template)
+
+  Included tasks:
+  1. <task name>
+  2. <task name>
+  ...
 ═══════════════════════════════════════════
 ```
