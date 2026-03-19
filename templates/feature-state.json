@@ -63,6 +63,9 @@
         {"action": "write tests first (TDD)", "done": false},
         {"action": "implement to pass tests", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
+        {"action": "if generating code/templates: tests must assert on OUTPUT CONTENT (correct syntax, imports, patterns), not just 'it ran without error'", "done": false},
+        {"action": "if generating code/templates: verify generated output compiles/parses (python -c 'import ast; ast.parse(open(f).read())' or similar)", "done": false},
+        {"action": "no silent exception handling in generated/scaffolded code — use logging not bare except:pass", "done": false},
         {"action": "dual-path wiring: if feature touches lifecycle/mount/events, wire into BOTH websocket.py (WebSocket) AND mixins/request.py (HTTP)", "done": false, "mandatory": true},
         {"action": "mixin wiring: if new mixin, verify MRO + __init__.py export + consumer hooks + client JS routing + HTTP path", "done": false},
         {"action": "update CHANGELOG.md with feat: entry", "done": false, "mandatory": true},
@@ -92,7 +95,7 @@
         {"action": "read .pipeline-state/<branch>-plan.md for the original plan", "done": false},
         {"action": "cross-ref plan vs implementation — mark each deliverable DONE/MISSING", "done": false},
         {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false, "mandatory": true},
-        {"action": "test coverage gaps", "done": false},
+        {"action": "test coverage gaps — if code generates output, do tests assert on content correctness (not just 'no error')?", "done": false},
         {"action": "type hints on public APIs", "done": false},
         {"action": "code quality (broad except, missing raise-from, unused params, lazy imports)", "done": false},
         {"action": "output REVIEW_PASSED or REVIEW_FAILED", "done": false, "mandatory": true}
