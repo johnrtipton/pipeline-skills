@@ -18,8 +18,14 @@ This skill is a tiny loop. The state file is the program. You are the executor.
 - `/pipeline-run --milestone v0.4.0 --priority P1` — pick next P1 task and run it
 - `/pipeline-run --milestone v0.4.0 --all` — **process ALL remaining tasks** in the milestone sequentially
 - `/pipeline-run --milestone v0.4.0 --priority P1 --all` — process all remaining P1 tasks
+- `/pipeline-run --all-milestones` — **process ALL milestones** from ROADMAP.md in order
+- `/pipeline-run --all-milestones --priority P0` — process all milestones, but only P0 tasks in each
+- `/pipeline-run --all-milestones --group` — process all milestones, grouping related tasks into batch PRs
+- `/pipeline-run --milestone v1.4 --all --group` — process all v1.4 tasks, grouped where it makes sense
 
 ## Before the Loop
+
+If `--all-milestones` was specified, jump to the **All Milestones Loop** section below.
 
 If no incomplete state file exists (no `.pipeline-state/*.json` with `completed_at` = null):
 1. If `--milestone` or `--priority` or `--feature` was specified, run the **pipeline-next** skill to pick a task and create the state file.
@@ -29,6 +35,14 @@ If no incomplete state file exists (no `.pipeline-state/*.json` with `completed_
 - `~/online_projects/ai/pipeline-skill/templates/feature-state.json`
 - `~/online_projects/ai/pipeline-skill/templates/bugfix-state.json`
 - `~/online_projects/ai/pipeline-skill/templates/refactor-state.json`
+
+## Autonomous Execution
+
+When `--all`, `--all-milestones`, or `--group` is specified, the pipeline runs **fully autonomously**. Do NOT pause to ask the user if they want to continue between tasks or groups. The flag itself is the user's confirmation. Only stop on failure.
+
+## Parallel Stages
+
+Stages 6 (Test Execution), 7 (Self-Review), and 8 (Security Check) are independent read-only stages. **Run them in parallel** by spawning 3 agents simultaneously. This cuts wall-clock time significantly. Wait for all 3 to complete before proceeding to Stage 9.
 
 ## The Loop
 
@@ -188,6 +202,69 @@ Print a milestone summary when all tasks are done:
   Failed: 1 (transition/priority — TESTS_FAILED)
 ═══════════════════════════════════════════
 ```
+
+## All Milestones Loop (--all-milestones mode)
+
+When `--all-milestones` is specified, wrap the existing `--all` outer loop inside a milestone loop.
+
+### Step 1: Discover milestones from ROADMAP.md
+
+Find the project's ROADMAP.md (check `ROADMAP.md`, `docs/ROADMAP.md`, `docs/roadmap.md`).
+
+Parse all `### Milestone: vX.Y.Z — Title` headings in document order. These are the milestones to process. Skip any milestone where ALL features in the Priority Matrix are marked completed (~~strikethrough~~ ✅).
+
+### Step 2: The milestone loop
+
+```
+milestones = [parsed from ROADMAP.md in order]
+
+for milestone in milestones:
+    1. Print: "Starting milestone: <milestone>"
+    2. Run the --all outer loop with --milestone <milestone>
+       - Pass through --priority if specified
+       - Pass through --group if specified (pipeline-next groups related tasks into batch PRs)
+       - This picks tasks/groups via pipeline-next, runs all stages, repeats until no tasks remain
+    3. If a task FAILS and stops the pipeline:
+       - Print the failure summary
+       - STOP the milestone loop (do not advance to the next milestone)
+       - The user can fix the issue and re-run --all-milestones to resume
+    4. Print milestone summary (tasks processed, succeeded, failed)
+    5. Continue to next milestone
+```
+
+**With `--group`**: pipeline-next analyzes remaining tasks per milestone and proposes groups of related small features that ship as a single PR. Large/complex tasks stay solo. This significantly reduces the number of PRs and avoids tiny one-liner branches.
+
+### Step 3: On completion
+
+When all milestones are processed, print a full summary:
+
+```
+═══════════════════════════════════════════
+  All Milestones Complete
+  Milestones: <count> processed
+  Tasks: <total> succeeded, <total> failed
+  PRs: #<list>
+
+  Per milestone:
+  - v1.4: 35 tasks, 35 succeeded
+  - v1.5: 42 tasks, 42 succeeded
+  - v2.0: 30 tasks, 30 succeeded
+═══════════════════════════════════════════
+```
+
+### Resume behavior
+
+On resume (`/pipeline-run --all-milestones` after a failure or interruption):
+
+1. Discover milestones from ROADMAP.md (same as initial run)
+2. For each milestone, check if all its tasks are done (state files with `completed_at` set, or merged PRs)
+3. Skip fully-completed milestones
+4. Resume from the first milestone with remaining work
+5. Within that milestone, the `--all` logic handles resuming from the incomplete task
+
+This means `--all-milestones` is always safe to re-run — it picks up where it left off.
+
+---
 
 ## Why This Works
 

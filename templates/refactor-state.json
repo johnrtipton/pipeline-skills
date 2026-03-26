@@ -52,6 +52,8 @@
         {"action": "read .pipeline-state/<branch>-analysis.md for the refactoring plan", "done": false, "mandatory": true},
         {"action": "apply refactoring per analysis plan", "done": false},
         {"action": "preserve ALL existing behavior — no functional changes", "done": false, "mandatory": true},
+        {"action": "if analysis specifies tests, write them — refactors that change structure need tests proving behavior is preserved", "done": false},
+        {"action": "cross-ref analysis test list against actual tests written", "done": false, "mandatory": true},
         {"action": "no new functionality added", "done": false},
         {"action": "git add -u + new files", "done": false},
         {"action": "git status clean", "done": false, "mandatory": true},
@@ -108,6 +110,7 @@
         {"action": "commit with refactor: prefix", "done": false},
         {"action": "git push -u origin", "done": false},
         {"action": "gh pr create with summary", "done": false},
+        {"action": "verify PR body against actual diff — no phantom features, wrong counts, or incorrect terminology; fix with gh pr edit if needed", "done": false, "mandatory": true},
         {"action": "output PR_CREATED/PR_EXISTS/PR_SKIPPED", "done": false, "mandatory": true}
       ]
     },
@@ -146,8 +149,9 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Run: gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
+      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Step 0: Run 'gh pr checks {pr_number}' — verify CI green. If pre-existing failure, document with gh pr comment before merging. Step 1: Run gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
       "checklist": [
+        {"action": "verify CI green: gh pr checks — if failing for pre-existing reasons, document in PR comment before merging", "done": false, "mandatory": true},
         {"action": "gh pr merge --squash --delete-branch (do NOT self-approve)", "done": false, "mandatory": true},
         {"action": "output PR_MERGED or MERGE_FAILED", "done": false, "mandatory": true}
       ]
@@ -157,7 +161,7 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Write retrospective for refactor: {task_description}. Project: {project_path}. PR #{pr_number}. Run git log {pr_target_branch}..HEAD. Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Output RETRO_COMPLETE.",
+      "subagent_prompt": "Write retrospective for refactor: {task_description}. Project: {project_path}. PR #{pr_number}. Run 'gh pr view {pr_number} --json commits,title,body' to get PR details (branch deleted after merge). Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Your FINAL output line MUST be exactly 'RETRO_COMPLETE'.",
       "checklist": [
         {"action": "rate quality 1-5", "done": false},
         {"action": "what went well + lessons learned", "done": false},

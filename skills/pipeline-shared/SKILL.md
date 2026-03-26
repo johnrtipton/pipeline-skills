@@ -218,6 +218,8 @@ Validate the project environment and create a fresh branch from upstream.
 
 5. **Smoke test**: Run a minimal import check (e.g., `python -c 'import django'` for Django projects).
 
+6. **Gitignore audit**: Check if `.gitignore` contains rules that would block adding new source files (e.g., a rule like `components/` that matches `src/*/components/`). If found, note it so the Implementation stage can use `git add -f` for blocked paths. Common gotcha: overly broad directory rules that match nested source directories.
+
 If any step fails, attempt to fix it before proceeding.
 
 ### Gate
@@ -293,6 +295,7 @@ Scan files changed by this task for security vulnerabilities. Pre-existing issue
 
 2. **Scan changed files** for these patterns:
    - `mark_safe` — must use `escape()` or `format_html()` for interpolated values
+   - `mark_safe` inside `<script>` blocks — HTML escaping (`conditional_escape`) is **insufficient** in JS context. User-controlled values interpolated inside `<script>` tags need allowlist validation (regex like `^[a-zA-Z0-9_-]+$`) or `json.dumps()`, not HTML entity escaping
    - `@csrf_exempt` — CSRF protection disabled without justification
    - `|safe` — template filter on user-controlled variables bypasses auto-escaping
    - Raw SQL queries (string interpolation in SQL)
@@ -300,6 +303,7 @@ Scan files changed by this task for security vulnerabilities. Pre-existing issue
    - `shell=True` — command injection risk
    - String concatenation in JS contexts — must use `json.dumps()` for JS string escaping
    - Unescaped user input in template tags
+   - `eval()` or `exec()` with user-controlled input — even with restricted builtins
 
 3. **Broad codebase scan** (for context): grep the full codebase for the same patterns. Hits in files NOT in your scope are pre-existing — report as `IMPROVEMENT:` lines, do NOT let them influence your verdict.
 
@@ -355,14 +359,21 @@ For new features or significant changes, determine what documentation users need
 
 **Docs index** — If you created a new doc page, add it to the docs index/README under the appropriate section with a one-line description.
 
-#### 4. CHANGELOG
+#### 4. Component gallery / discovery
+
+If the project has a component gallery or auto-discovery system:
+- Add gallery examples for any new template tags or components
+- Update discovery tests if they hardcode expected component lists
+- Verify the gallery renders new components correctly (if a `--dry-run` flag exists, use it)
+
+#### 5. CHANGELOG
 
 For `feat:` and `fix:` changes:
 - Update `CHANGELOG.md` (if the project has one)
 - Add an entry under the current/unreleased version section
 - Follow the existing format (typically: `- **Feature name** — description (#issue)`)
 
-#### 5. CLAUDE.md / project config
+#### 6. CLAUDE.md / project config
 
 If the change introduces:
 - New conventions, patterns, or architectural decisions
@@ -371,7 +382,7 @@ If the change introduces:
 
 Suggest updating `CLAUDE.md` to reflect these (note in your output, don't modify CLAUDE.md directly unless the pipeline is for that project).
 
-#### 6. Quality checks
+#### 7. Quality checks
 
 - No orphaned docs — if you renamed/removed a feature, remove or redirect its docs
 - No broken internal links — verify `[link text](path)` references are valid
@@ -426,6 +437,8 @@ Create a branch, commit changes, push, and create a pull request.
 9. **Create PR**: `gh pr create --base <pr_target_branch> --title "<type>: <description>" --body '<summary>'`
    - If PR already exists: `echo 'PR already exists'`
    - If task is linked to a GitHub issue, include `Closes #<issue-number>` in the PR body
+
+10. **Verify PR body**: Re-read the PR description against `git diff <pr_target_branch>...HEAD --stat`. The PR body must not mention features, template tags, error codes, or APIs that don't exist in the diff. Must not cite incorrect test counts or file counts, or use terminology that contradicts the code. If discrepancies are found, fix with `gh pr edit <pr_number> --body '<corrected body>'`.
 
 ### Gate
 - **Pass**: `PR_CREATED: <full PR URL>` or `PR_EXISTS: <full PR URL>` or `PR_SKIPPED: <reason>`
@@ -635,6 +648,10 @@ Approve and merge the pull request.
 
 ### Steps
 
+0. **Verify CI**: Run `gh pr checks <pr_number>`. All checks must pass before merging.
+   - If CI is failing due to changes in this PR, do NOT merge — go back and fix the issue.
+   - If CI is failing due to pre-existing issues (not introduced by this PR), document it in a PR comment (`gh pr comment <pr_number> --body 'CI note: <description of pre-existing failure>'`) and proceed.
+
 1. Merge: `gh pr merge <pr-number> --squash --delete-branch`
    - Note: Do NOT run `gh pr review --approve` — GitHub blocks self-approval on PRs you authored. The review comment from the Code Review stage serves as the review record.
 
@@ -651,17 +668,18 @@ Review the pipeline execution and provide feedback for continuous improvement.
 
 ### Steps
 
-1. Rate the execution quality (1-5)
-2. What went well?
-3. What could improve? (prompt quality, stage ordering, quality gates)
-4. Lessons learned — insights about the codebase, architecture, or process
-5. Suggest follow-up tasks if needed
-6. Output improvement ideas as `IDEA:` lines — one per line:
+1. Get PR details: `gh pr view <pr_number> --json commits,title,body,mergedAt` (the branch may have been deleted by squash merge — do NOT rely on `git log <target>..HEAD`)
+2. Rate the execution quality (1-5)
+3. What went well?
+4. What could improve? (prompt quality, stage ordering, quality gates)
+5. Lessons learned — insights about the codebase, architecture, or process
+6. Suggest follow-up tasks if needed
+7. Output improvement ideas as `IDEA:` lines — one per line:
    ```
    IDEA: Add retry backoff to reduce flaky test failures
    IDEA: Split large prompts into focused sub-prompts
    ```
-7. If you created useful scripts or tools, output as:
+8. If you created useful scripts or tools, output as:
    ```
    TOOL: name | language | one-line description
    ```

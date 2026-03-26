@@ -48,6 +48,7 @@
         {"action": "read codebase for current state", "done": false},
         {"action": "list files to create/modify", "done": false},
         {"action": "key design decisions", "done": false},
+        {"action": "identify user-configurable values entering unescaped contexts (mark_safe, autoescape off, |safe, JS embedding) — plan input validation for each", "done": false},
         {"action": "test strategy", "done": false},
         {"action": "potential risks", "done": false},
         {"action": "write plan to .pipeline-state/<branch>-plan.md so later stages can read it", "done": false, "mandatory": true}
@@ -60,7 +61,7 @@
       "checklist": [
         {"action": "read .pipeline-state/<branch>-plan.md for the implementation plan", "done": false, "mandatory": true},
         {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml [tool.pytest.ini_options] testpaths)", "done": false, "mandatory": true},
-        {"action": "write tests first (TDD)", "done": false},
+        {"action": "write tests first (TDD)", "done": false, "mandatory": true},
         {"action": "implement to pass tests", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
         {"action": "if generating code/templates: tests must assert on OUTPUT CONTENT (correct syntax, imports, patterns), not just 'it ran without error'", "done": false},
@@ -69,6 +70,9 @@
         {"action": "dual-path wiring: if feature touches lifecycle/mount/events, wire into BOTH websocket.py (WebSocket) AND mixins/request.py (HTTP)", "done": false, "mandatory": true},
         {"action": "mixin wiring: if new mixin, verify MRO + __init__.py export + consumer hooks + client JS routing + HTTP path", "done": false},
         {"action": "update CHANGELOG.md with feat: entry", "done": false, "mandatory": true},
+        {"action": "if adding new component/tag: add gallery example in gallery/examples.py (or per-category example file)", "done": false},
+        {"action": "if adding new component class: update gallery discovery test expected set (or verify test is dynamic)", "done": false},
+        {"action": "if .gitignore blocks new files: use git add -f and note the gitignore issue", "done": false},
         {"action": "add system check tests if new check codes introduced", "done": false},
         {"action": "git add -u + new files", "done": false},
         {"action": "git status clean", "done": false, "mandatory": true},
@@ -143,6 +147,7 @@
         {"action": "commit with feat: prefix", "done": false},
         {"action": "git push -u origin", "done": false},
         {"action": "gh pr create with summary", "done": false},
+        {"action": "verify PR body against actual diff — no phantom features, wrong counts, or incorrect terminology; fix with gh pr edit if needed", "done": false, "mandatory": true},
         {"action": "output PR_CREATED/PR_EXISTS/PR_SKIPPED", "done": false, "mandatory": true}
       ]
     },
@@ -151,12 +156,13 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-plan.md for the original plan. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists — use as review framework. Step 2: Cross-ref plan vs implementation — verify every planned deliverable was implemented. Step 3: Review for correctness, security (mark_safe/|safe/csrf_exempt/XSS/injection), testing gaps, code quality (print vs logging, f-string loggers, console.log guards, except:pass), docs (CHANGELOG updated), perf (N+1 queries), architecture. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
+      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-plan.md for the original plan. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists — use as review framework. Step 2: Cross-ref plan vs implementation — verify every planned deliverable was implemented. Step 2b: Cross-ref the plan's test list against actual test files — every test the plan specified must exist. Step 3: Review for correctness, security (mark_safe/|safe/csrf_exempt/XSS/injection), testing gaps, code quality (print vs logging, f-string loggers, console.log guards, except:pass), docs (CHANGELOG updated), perf (N+1 queries), architecture. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
       "checklist": [
         {"action": "read .pipeline-state/<branch>-plan.md for plan compliance check", "done": false},
         {"action": "git diff against target branch", "done": false},
         {"action": "load project PR checklist if exists (docs/PULL_REQUEST_CHECKLIST.md)", "done": false},
         {"action": "cross-ref plan vs implementation — every deliverable accounted for", "done": false, "mandatory": true},
+        {"action": "cross-ref plan's test list against actual tests — every test the plan called for must exist", "done": false, "mandatory": true},
         {"action": "review: correctness, security, testing, quality, docs, perf, architecture", "done": false},
         {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false},
         {"action": "run full test suite, report pass/fail", "done": false, "mandatory": true},
@@ -180,8 +186,9 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Run: gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
+      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Step 0: Run 'gh pr checks {pr_number}' — verify CI green. If pre-existing failure, document with gh pr comment before merging. Step 1: Run gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
       "checklist": [
+        {"action": "verify CI green: gh pr checks — if failing for pre-existing reasons, document in PR comment before merging", "done": false, "mandatory": true},
         {"action": "gh pr merge --squash --delete-branch (do NOT self-approve)", "done": false, "mandatory": true},
         {"action": "output PR_MERGED or MERGE_FAILED", "done": false, "mandatory": true}
       ]
@@ -191,7 +198,7 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Write retrospective for feature: {task_description}. Project: {project_path}. PR #{pr_number}. Run git log {pr_target_branch}..HEAD. Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Output RETRO_COMPLETE.",
+      "subagent_prompt": "Write retrospective for feature: {task_description}. Project: {project_path}. PR #{pr_number}. Run 'gh pr view {pr_number} --json commits,title,body' to get PR details (branch deleted after merge). Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Your FINAL output line MUST be exactly 'RETRO_COMPLETE'.",
       "checklist": [
         {"action": "rate quality 1-5", "done": false},
         {"action": "what went well + lessons learned", "done": false},

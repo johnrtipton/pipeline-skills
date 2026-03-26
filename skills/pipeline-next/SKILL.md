@@ -65,7 +65,9 @@ If `--group` is specified, analyze the remaining (not-done) tasks and group them
 - Large/complex tasks (like "Transition/priority updates") stay solo
 - Bug fixes are never grouped with features
 
-**Suggested groupings for typical djust v0.4.0 quick wins:**
+**Suggested groupings — these are examples, not exhaustive. Analyze the actual ROADMAP tasks to propose project-specific groups.**
+
+djust core (v0.4.0 quick wins):
 
 | Group | Tasks | Theme |
 |---|---|---|
@@ -76,6 +78,47 @@ If `--group` is specified, analyze the remaining (not-done) tasks and group them
 | Document metadata | `live_title` & document metadata | Server + client metadata |
 | Reconnection | Form recovery, Reconnection backoff with jitter | WebSocket reconnection path |
 | Dev tooling | Error messages, `djust_doctor`, Latency simulator | Developer experience |
+
+djust-components (v1.4):
+
+| Group | Tasks | Theme |
+|---|---|---|
+| CSS Batch 1 | Kbd (#38), Copy Button (#37), Rating (#36), Code Block (#34), Collapsible (#39) | Simple inline component CSS |
+| CSS Batch 2 | Popover (#32), Sheet/Drawer (#41), Context Menu (#42), Command Palette (#45) | Overlay/positioning CSS |
+| CSS Batch 3 | Combobox (#31), Color Picker (#40), Date Picker (#46), File Dropzone (#47) | Form control CSS |
+| CSS Batch 4 | Notification Center, Tree View, Gauge, Carousel, Virtual List, Kanban, ToC, Split Pane, Rich Text Editor | Complex component CSS |
+| Trivial layout components | Aspect Ratio (#116), Sticky Header (#171), Page Header (#179), Description List (#134), Callout (#67) | Simple CSS-only layout, zero JS |
+| Small feedback components | Status Indicator (#128), Notification Badge (#105), Loading Overlay (#104), Announcement Bar (#106) | Simple feedback/status indicators |
+| Simple form primitives | Label (#66), Fieldset (#147), Toggle Group (#61), Input Group (#64) | Form layout building blocks |
+| Client-side utilities | Scroll to Top (#125), Relative Time (#146), Theme Toggle (#138), Scroll Area (#62) | Small JS + CSS, no server events |
+| Code & copy components | Code Snippet (#139), Copyable Text (#153), Copy Button CSS | Code display + clipboard |
+| Real-time djust-native | Streaming Text (#129), Connection Status Bar (#175), Live Counter (#176), Server Event Toast (#177) | WebSocket-powered components |
+| New form inputs | Multi-select (#53), OTP Input (#58), Number Stepper (#59), Tag Input (#63) | Form input components |
+| Rich display components | Rich Select (#103), Split Button (#133), Progress Circle (#124), Segmented Progress (#107) | Enhanced display components |
+| Component classes | Alert, StatCard, Tag/Chip, Toast, Progress, Spinner, Switch class expansion | Python class APIs |
+| Data Table Pro P1 | Sorting, selection, filtering, search, ARIA, DataTableMixin | SOLO — too large to group |
+| Data Table Pro P2 | Inline editing, resize, reorder, frozen cols, density, responsive | SOLO — too large to group |
+| Data Table Pro P3 | Row expansion, bulk actions, export, virtual scroll, faceted filter | SOLO — too large to group |
+
+djust-components (v1.5):
+
+| Group | Tasks | Theme |
+|---|---|---|
+| Form essentials | Slider (#82), Search Input (#83), Password Input (#84), Autocomplete (#85) | Missing form inputs |
+| Confirmation patterns | Confirmation Dialog (#75), Popconfirm (#180) | User confirmation UX |
+| Cascading forms | Dependent Select (#108), Currency Input (#109), Form Validation Display (#110) | Form interaction patterns |
+| App chrome | Sidebar Nav (#86), Navigation Menu (#90), App Shell (#167) | Application layout shell |
+| Toolbar & editing | Toolbar (#87), Inline Edit (#88), Filter Bar (#166) | Action bar patterns |
+| Social components | Avatar Group (#89), Hover Card (#91), Notification Popover (#168) | User-facing social UX |
+| AI chat UI | Conversation Thread (#130), AI Thinking Indicator (#160), Multimodal Input (#159), Feedback Widget (#149) | AI application interface |
+| AI trust UI | Approval Gate (#155), Source Citation (#156), Model Selector (#131), Token Counter (#132) | AI safety and transparency |
+| Collaboration | Chat Bubble (#55), Presence Avatars (#56), Mentions Input (#57) | Real-time collaboration |
+| Text display | Expandable Text (#118), Truncated List (#150), Inline Markdown Preview (#169) | Text truncation/preview |
+| Loading patterns | Skeleton Factory (#144), Content Loader / Suspense (#152) | Loading state management |
+| Data export/import | Export Dialog (#161), Import Wizard (#162), Audit Log Table (#163) | Enterprise data workflows |
+| Django integration | Django Form Renderer (#73), ModelForm Table (#74) | Django ecosystem bridges |
+| Data Table Pro P4 | Column formatters, footer aggregation, conditional styling, multi-level headers | SOLO — too large to group |
+| Data Table Pro P5 | CSV import, computed columns, cell merge, column expressions | SOLO — too large to group |
 
 Print the proposed groups with `--list --group`. Without `--list`, pick the highest-priority group.
 

@@ -40,6 +40,7 @@
         {"action": "search codebase for relevant code paths", "done": false},
         {"action": "identify root cause (not just symptom)", "done": false, "mandatory": true},
         {"action": "propose targeted fix", "done": false},
+        {"action": "if fix involves user-configurable values in unescaped contexts (mark_safe, autoescape off, |safe, JS embedding), plan input validation", "done": false},
         {"action": "scope check — output SCOPE_EXPANDED if broader than spec", "done": false},
         {"action": "write diagnosis to .pipeline-state/<branch>-diagnosis.md so later stages can read it", "done": false, "mandatory": true}
       ]
@@ -110,6 +111,7 @@
         {"action": "commit with fix: prefix", "done": false},
         {"action": "git push -u origin", "done": false},
         {"action": "gh pr create with summary", "done": false},
+        {"action": "verify PR body against actual diff — no phantom features, wrong counts, or incorrect terminology; fix with gh pr edit if needed", "done": false, "mandatory": true},
         {"action": "output PR_CREATED/PR_EXISTS/PR_SKIPPED", "done": false, "mandatory": true}
       ]
     },
@@ -148,8 +150,9 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Run: gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
+      "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Step 0: Run 'gh pr checks {pr_number}' — verify CI green. If pre-existing failure, document with gh pr comment before merging. Step 1: Run gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
       "checklist": [
+        {"action": "verify CI green: gh pr checks — if failing for pre-existing reasons, document in PR comment before merging", "done": false, "mandatory": true},
         {"action": "gh pr merge --squash --delete-branch (do NOT self-approve)", "done": false, "mandatory": true},
         {"action": "output PR_MERGED or MERGE_FAILED", "done": false, "mandatory": true}
       ]
@@ -159,7 +162,7 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Write retrospective for bug fix: {task_description}. Project: {project_path}. PR #{pr_number}. Run git log {pr_target_branch}..HEAD. Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Output RETRO_COMPLETE.",
+      "subagent_prompt": "Write retrospective for bug fix: {task_description}. Project: {project_path}. PR #{pr_number}. Run 'gh pr view {pr_number} --json commits,title,body' to get PR details (branch deleted after merge). Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Your FINAL output line MUST be exactly 'RETRO_COMPLETE'.",
       "checklist": [
         {"action": "rate quality 1-5", "done": false},
         {"action": "what went well + lessons learned", "done": false},
