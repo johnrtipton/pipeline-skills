@@ -1,3 +1,12 @@
+---
+name: pipeline-ship
+description: >
+  Ship existing changes through quality gates to a merged PR.
+  Starts from uncommitted/committed changes in your working tree and runs
+  test → review → security → docs → commit → PR → code review → merge → retrospective.
+  Use when you've been coding interactively and want to formalize and ship.
+---
+
 # pipeline-ship
 
 Ship existing changes through quality gates to a merged PR. Unlike `pipeline-next` + `pipeline-run` which starts from a ROADMAP task, `pipeline-ship` starts from **changes already in your working tree** (staged, unstaged, or recently committed) and runs them through test → review → security → docs → commit → PR → code review → merge → retrospective.
