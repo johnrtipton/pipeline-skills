@@ -46,7 +46,7 @@ Use this when you've been coding interactively and want to formalize, review, an
    - If `--description` provided: use it
    - Otherwise: read the diff and generate a one-line summary
 5. Create state file:
-   - Read template from `~/online_projects/ai/pipeline-skill/templates/ship-state.json`
+   - Read template from the pipeline plugin's `templates/ship-state.json` (locate via directory containing `pipeline.py`, or `PIPELINE_SKILL_DIR` env var)
    - Fill in: `task_description`, `branch_name`, `pr_target_branch`, `project_path`, `started_at`
    - Write to `.pipeline-state/<branch-name>.json`
    - Ensure `.pipeline-state/` is in `.gitignore`
@@ -70,7 +70,7 @@ The ship template has **10 stages** (compared to 14 for a full feature pipeline)
 | 1 | **Inventory Changes** | Catalog all changes (diff, status, classify) | `INVENTORY_COMPLETE` |
 | 2 | **Test Execution** | Run full test suite | `TESTS_PASSED` / `TESTS_FAILED` |
 | 3 | **Self-Review** | Re-read diff as reviewer, check auto-reject triggers, fix issues | `REVIEW_PASSED` / `REVIEW_FAILED` |
-| 4 | **Security Check** | Scan for mark_safe, XSS, csrf_exempt, secrets | `SECURITY_PASSED` / `SECURITY_FAILED` |
+| 4 | **Security Check** | Scan for security patterns per profile (secrets, XSS, injection) | `SECURITY_PASSED` / `SECURITY_FAILED` |
 | 5 | **Documentation** | Update docs, CHANGELOG, docstrings | `DOCS_UPDATED` / `DOCS_SKIPPED` |
 | 6 | **Commit & PR** | Stage, commit, push, create PR | `PR_CREATED` / `PR_EXISTS` |
 | 7 | **Code Review** | Subagent reviews the PR, posts to GitHub | `APPROVE` / `REQUEST_CHANGES` |
@@ -123,10 +123,10 @@ Auto-detected from the project (same as pipeline-shared):
 
 ```bash
 # You've been coding for an hour, changes look good — ship them
-/pipeline-ship --description "integrate djust-theming into component gallery"
+/pipeline-ship --description "add user authentication with OAuth2"
 
 # Ship changes on an existing feature branch
-/pipeline-ship --branch feat/gallery-theming
+/pipeline-ship --branch feat/oauth2-auth
 
 # Just get it reviewed, don't merge yet
 /pipeline-ship --no-merge

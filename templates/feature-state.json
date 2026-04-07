@@ -48,7 +48,6 @@
         {"action": "read codebase for current state", "done": false},
         {"action": "list files to create/modify", "done": false},
         {"action": "key design decisions", "done": false},
-        {"action": "identify user-configurable values entering unescaped contexts (mark_safe, autoescape off, |safe, JS embedding) — plan input validation for each", "done": false},
         {"action": "test strategy", "done": false},
         {"action": "potential risks", "done": false},
         {"action": "write plan to .pipeline-state/<branch>-plan.md so later stages can read it", "done": false, "mandatory": true}
@@ -60,20 +59,11 @@
       "verdict": null,
       "checklist": [
         {"action": "read .pipeline-state/<branch>-plan.md for the implementation plan", "done": false, "mandatory": true},
-        {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml [tool.pytest.ini_options] testpaths)", "done": false, "mandatory": true},
         {"action": "write tests first (TDD)", "done": false, "mandatory": true},
         {"action": "implement to pass tests", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
-        {"action": "if generating code/templates: tests must assert on OUTPUT CONTENT (correct syntax, imports, patterns), not just 'it ran without error'", "done": false},
-        {"action": "if generating code/templates: verify generated output compiles/parses (python -c 'import ast; ast.parse(open(f).read())' or similar)", "done": false},
-        {"action": "no silent exception handling in generated/scaffolded code — use logging not bare except:pass", "done": false},
-        {"action": "dual-path wiring: if feature touches lifecycle/mount/events, wire into BOTH websocket.py (WebSocket) AND mixins/request.py (HTTP)", "done": false, "mandatory": true},
-        {"action": "mixin wiring: if new mixin, verify MRO + __init__.py export + consumer hooks + client JS routing + HTTP path", "done": false},
-        {"action": "update CHANGELOG.md with feat: entry", "done": false, "mandatory": true},
-        {"action": "if adding new component/tag: add gallery example in gallery/examples.py (or per-category example file)", "done": false},
-        {"action": "if adding new component class: update gallery discovery test expected set (or verify test is dynamic)", "done": false},
+        {"action": "update CHANGELOG.md if project has one", "done": false},
         {"action": "if .gitignore blocks new files: use git add -f and note the gitignore issue", "done": false},
-        {"action": "add system check tests if new check codes introduced", "done": false},
         {"action": "git add -u + new files", "done": false},
         {"action": "git status clean", "done": false, "mandatory": true},
         {"action": "write list of all changed files to .pipeline-state/<branch>-changes.txt (git diff --name-only HEAD)", "done": false, "mandatory": true}
@@ -98,7 +88,7 @@
       "checklist": [
         {"action": "read .pipeline-state/<branch>-plan.md for the original plan", "done": false},
         {"action": "cross-ref plan vs implementation — mark each deliverable DONE/MISSING", "done": false},
-        {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false, "mandatory": true},
+        {"action": "check auto-reject triggers (per profile and generic: print vs logging, except:pass, no tests, phantom modules, stub code)", "done": false, "mandatory": true},
         {"action": "test coverage gaps — if code generates output, do tests assert on content correctness (not just 'no error')?", "done": false},
         {"action": "type hints on public APIs", "done": false},
         {"action": "code quality (broad except, missing raise-from, unused params, lazy imports)", "done": false},
@@ -112,7 +102,7 @@
       "skip_if": "DOCS_ONLY",
       "checklist": [
         {"action": "get changed files list", "done": false},
-        {"action": "scan for mark_safe/csrf_exempt/|safe/raw SQL/secrets/shell=True/JS string escaping", "done": false},
+        {"action": "scan changed files for security patterns (per profile: secrets, injection, XSS, etc.)", "done": false},
         {"action": "broad codebase scan — pre-existing issues as IMPROVEMENT: lines only", "done": false},
         {"action": "output SECURITY_PASSED or SECURITY_FAILED", "done": false, "mandatory": true}
       ]
@@ -156,7 +146,7 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-plan.md for the original plan. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists — use as review framework. Step 2: Cross-ref plan vs implementation — verify every planned deliverable was implemented. Step 2b: Cross-ref the plan's test list against actual test files — every test the plan specified must exist. Step 3: Review for correctness, security (mark_safe/|safe/csrf_exempt/XSS/injection), testing gaps, code quality (print vs logging, f-string loggers, console.log guards, except:pass), docs (CHANGELOG updated), perf (N+1 queries), architecture. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
+      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-plan.md for the original plan. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists — use as review framework. Step 2: Cross-ref plan vs implementation — verify every planned deliverable was implemented. Step 2b: Cross-ref the plan's test list against actual test files — every test the plan specified must exist. Step 3: Review for correctness, security (XSS, injection, secrets exposure), testing gaps, code quality (print vs logging, except:pass), docs, perf, architecture. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
       "checklist": [
         {"action": "read .pipeline-state/<branch>-plan.md for plan compliance check", "done": false},
         {"action": "git diff against target branch", "done": false},
@@ -164,7 +154,7 @@
         {"action": "cross-ref plan vs implementation — every deliverable accounted for", "done": false, "mandatory": true},
         {"action": "cross-ref plan's test list against actual tests — every test the plan called for must exist", "done": false, "mandatory": true},
         {"action": "review: correctness, security, testing, quality, docs, perf, architecture", "done": false},
-        {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false},
+        {"action": "check auto-reject triggers (per profile and generic: print vs logging, except:pass, no tests, phantom modules, stub code)", "done": false},
         {"action": "run full test suite, report pass/fail", "done": false, "mandatory": true},
         {"action": "post review to GitHub: gh pr review --comment with formatted checklist and findings", "done": false, "mandatory": true},
         {"action": "save to pr/feedback/ if directory exists", "done": false},

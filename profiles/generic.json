@@ -1,0 +1,30 @@
+{
+  "name": "generic",
+  "description": "Framework-agnostic defaults for any project",
+  "detection": [],
+  "environment": {
+    "smoke_test": null,
+    "venv_check": true,
+    "dependency_command": null
+  },
+  "security_patterns": [
+    "hardcoded secrets, API keys, or passwords",
+    "shell=True with user-controlled input (command injection)",
+    "eval()/exec() with user-controlled input",
+    "raw SQL with string interpolation (SQL injection)",
+    "XSS in HTML output (unescaped user input)"
+  ],
+  "auto_reject_triggers": [
+    "print() instead of project logging system",
+    "silent exception handling (except: pass)",
+    "no tests for new functionality",
+    "tests reference modules/APIs that don't exist in the diff",
+    "placeholder/stub code shipped as production"
+  ],
+  "stage_additions": {},
+  "docs": {
+    "changelog": true,
+    "changelog_file": "CHANGELOG.md",
+    "gallery_support": false
+  }
+}

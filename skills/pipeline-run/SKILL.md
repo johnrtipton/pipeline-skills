@@ -31,10 +31,10 @@ If no incomplete state file exists (no `.pipeline-state/*.json` with `completed_
 1. If `--milestone` or `--priority` or `--feature` was specified, run the **pipeline-next** skill to pick a task and create the state file.
 2. If no flags specified, tell the user: "No incomplete pipeline found. Run `/pipeline-run --milestone v0.4.0` to pick a task from the roadmap."
 
-**State file templates are at** (read directly, do not search):
-- `~/online_projects/ai/pipeline-skill/templates/feature-state.json`
-- `~/online_projects/ai/pipeline-skill/templates/bugfix-state.json`
-- `~/online_projects/ai/pipeline-skill/templates/refactor-state.json`
+**State file templates** are in the pipeline plugin's `templates/` directory (locate via the directory containing `pipeline.py`, or `PIPELINE_SKILL_DIR` env var):
+- `templates/feature-state.json`
+- `templates/bugfix-state.json`
+- `templates/refactor-state.json`
 
 ## Autonomous Execution
 

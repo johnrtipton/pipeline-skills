@@ -37,6 +37,147 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+PROFILES_DIR = Path(__file__).parent / "profiles"
+
+
+def deep_merge(base: dict, overlay: dict) -> dict:
+    """Deep merge overlay into base. Lists are concatenated, dicts are merged recursively."""
+    result = base.copy()
+    for key, value in overlay.items():
+        if key in result:
+            if isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = deep_merge(result[key], value)
+            elif isinstance(result[key], list) and isinstance(value, list):
+                result[key] = result[key] + value
+            else:
+                result[key] = value
+        else:
+            result[key] = value
+    return result
+
+
+def detect_profile(project: str) -> str:
+    """Auto-detect the appropriate profile for a project."""
+    project_path = Path(project)
+
+    # Check CLAUDE.md for explicit pipeline_profile setting
+    claude_md = project_path / "CLAUDE.md"
+    if claude_md.exists():
+        content = claude_md.read_text()
+        match = re.search(r"pipeline_profile:\s*(\w+)", content)
+        if match:
+            return match.group(1)
+
+    # Auto-detect from project files
+    if (project_path / "manage.py").exists():
+        return "django"
+    pyproject = project_path / "pyproject.toml"
+    if pyproject.exists():
+        content = pyproject.read_text().lower()
+        if "django" in content:
+            return "django"
+
+    return "generic"
+
+
+def load_profile(profile_name: str) -> dict:
+    """Load a profile, merging with generic base if not already generic."""
+    generic_path = PROFILES_DIR / "generic.json"
+    profile_path = PROFILES_DIR / f"{profile_name}.json"
+
+    if not profile_path.exists():
+        print(f"Warning: profile '{profile_name}' not found, using generic")
+        profile_path = generic_path
+
+    with open(generic_path) as f:
+        base = json.load(f)
+
+    if profile_name == "generic":
+        return base
+
+    with open(profile_path) as f:
+        overlay = json.load(f)
+
+    return deep_merge(base, overlay)
+
+
+def load_project_overrides(project: str, pipeline_type: str) -> tuple[dict | None, dict | None]:
+    """Load per-repo .pipeline/ overrides. Returns (template_override, profile_override)."""
+    pipeline_dir = Path(project) / ".pipeline"
+    template_override = None
+    profile_override = None
+
+    if not pipeline_dir.exists():
+        return None, None
+
+    # Check for template override
+    template_path = pipeline_dir / f"{pipeline_type}-state.json"
+    if template_path.exists():
+        with open(template_path) as f:
+            template_override = json.load(f)
+
+    # Check for profile override
+    profile_path = pipeline_dir / "profile.json"
+    if profile_path.exists():
+        with open(profile_path) as f:
+            profile_override = json.load(f)
+
+    return template_override, profile_override
+
+
+def apply_profile(state: dict, profile: dict) -> dict:
+    """Inject profile content into a state file's stages."""
+    pipeline_type = state["pipeline_type"]
+
+    # Inject stage_additions into matching stages' checklists
+    for key, additions in profile.get("stage_additions", {}).items():
+        parts = key.split(".")
+        if len(parts) != 2:
+            continue
+        ptype, stage_num = parts
+        if ptype != pipeline_type:
+            continue
+        if stage_num in state["stages"]:
+            stage = state["stages"][stage_num]
+            checklist = stage.get("checklist", [])
+            # Insert profile additions before the last mandatory item (usually the verdict output)
+            insert_idx = len(checklist)
+            for i in range(len(checklist) - 1, -1, -1):
+                if checklist[i].get("mandatory"):
+                    insert_idx = i
+                    break
+            for j, item in enumerate(additions):
+                checklist.insert(insert_idx + j, item)
+            stage["checklist"] = checklist
+
+    # Inject security patterns into security check stages
+    security_patterns = profile.get("security_patterns", [])
+    if security_patterns:
+        pattern_text = ", ".join(security_patterns[:6])  # Keep concise
+        for stage in state["stages"].values():
+            for item in stage.get("checklist", []):
+                if "scan changed files for security patterns" in item.get("action", ""):
+                    item["action"] = f"scan changed files for: {pattern_text}"
+
+    # Inject auto-reject triggers into subagent prompts
+    auto_reject = profile.get("auto_reject_triggers", [])
+    if auto_reject:
+        trigger_text = ", ".join(auto_reject[:6])
+        for stage in state["stages"].values():
+            prompt = stage.get("subagent_prompt", "")
+            if "auto-reject triggers" in prompt.lower() and "{profile_triggers}" in prompt:
+                stage["subagent_prompt"] = prompt.replace("{profile_triggers}", trigger_text)
+
+    # Store profile info in state
+    state["profile"] = profile.get("name", "generic")
+    state["profile_config"] = {
+        "security_patterns": profile.get("security_patterns", []),
+        "auto_reject_triggers": profile.get("auto_reject_triggers", []),
+        "environment": profile.get("environment", {}),
+        "docs": profile.get("docs", {}),
+    }
+
+    return state
 
 
 def slugify(text: str) -> str:
@@ -45,8 +186,16 @@ def slugify(text: str) -> str:
     return slug.strip("-")[:50]
 
 
-def load_template(pipeline_type: str) -> dict:
-    """Load the state file template for a pipeline type."""
+def load_template(pipeline_type: str, project: str | None = None) -> dict:
+    """Load the state file template, checking for project overrides first."""
+    # Check for project-level template override
+    if project:
+        override_path = Path(project) / ".pipeline" / f"{pipeline_type}-state.json"
+        if override_path.exists():
+            print(f"  Using project template override: {override_path}")
+            with open(override_path) as f:
+                return json.load(f)
+
     template_path = TEMPLATES_DIR / f"{pipeline_type}-state.json"
     if not template_path.exists():
         print(f"Error: template not found: {template_path}")
@@ -55,17 +204,33 @@ def load_template(pipeline_type: str) -> dict:
         return json.load(f)
 
 
-def init_state(pipeline_type: str, task: str, project: str, target_branch: str) -> dict:
-    """Create a new state file from template."""
-    state = load_template(pipeline_type)
+def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
+               profile_name: str | None = None) -> dict:
+    """Create a new state file from template, applying profile and project overrides."""
+    project = os.path.abspath(project)
+    state = load_template(pipeline_type, project)
     prefix = {"feature": "feat", "bugfix": "fix", "refactor": "refactor"}[pipeline_type]
     branch = f"{prefix}/{slugify(task)}"
 
     state["task_description"] = task
     state["branch_name"] = branch
     state["pr_target_branch"] = target_branch
-    state["project_path"] = os.path.abspath(project)
+    state["project_path"] = project
     state["started_at"] = datetime.now(timezone.utc).isoformat()
+
+    # Load and apply profile
+    if not profile_name:
+        profile_name = detect_profile(project)
+    profile = load_profile(profile_name)
+
+    # Check for project-level profile overrides
+    _, profile_override = load_project_overrides(project, pipeline_type)
+    if profile_override:
+        print(f"  Applying project profile override from .pipeline/profile.json")
+        profile = deep_merge(profile, profile_override)
+
+    state = apply_profile(state, profile)
+    print(f"  Profile: {profile.get('name', profile_name)}")
 
     return state
 
@@ -82,13 +247,18 @@ def save_state(state: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(state, f, indent=2)
-    # Ensure .pipeline-state/ is gitignored
+    # Ensure .pipeline-state/ and .pipeline-log.md are gitignored
     gitignore = Path(state["project_path"]) / ".gitignore"
     if gitignore.exists():
         content = gitignore.read_text()
+        additions = []
         if ".pipeline-state/" not in content:
+            additions.append(".pipeline-state/")
+        if ".pipeline-log.md" not in content:
+            additions.append(".pipeline-log.md")
+        if additions:
             with open(gitignore, "a") as f:
-                f.write("\n.pipeline-state/\n")
+                f.write("\n" + "\n".join(additions) + "\n")
     return path
 
 
@@ -750,6 +920,8 @@ Examples:
     parser.add_argument("--all", dest="process_all", action="store_true",
                         help="Process all matching tasks (default: just the first)")
     parser.add_argument("--roadmap", help="Path to ROADMAP.md (auto-detected if not specified)")
+    # Profile options
+    parser.add_argument("--profile", help="Pipeline profile (generic/django/... or auto-detect)")
 
     args = parser.parse_args()
 
@@ -806,7 +978,8 @@ Examples:
     if args.type not in ("feature", "bugfix", "refactor"):
         parser.error(f"Unknown pipeline type: {args.type}")
 
-    state = init_state(args.type, args.task, args.project, args.target_branch)
+    state = init_state(args.type, args.task, args.project, args.target_branch,
+                       profile_name=args.profile)
 
     # Check if state file already exists (duplicate)
     existing = state_path(state["project_path"], state["branch_name"])

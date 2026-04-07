@@ -20,4 +20,13 @@ for skill in "${SCRIPT_DIR}/skills/pipeline-"*; do
     fi
 done
 
-echo "Done. Skills available: /pipeline-next, /pipeline-run, pipeline-shared (reference)"
+# Install profiles alongside pipeline.py (they're resolved relative to pipeline.py)
+echo ""
+echo "Profiles installed at: ${SCRIPT_DIR}/profiles/"
+ls "${SCRIPT_DIR}/profiles/"*.json 2>/dev/null | while read f; do
+    echo "  $(basename "$f")"
+done
+
+echo ""
+echo "Done. Skills available: /pipeline-next, /pipeline-run, /pipeline-ship, pipeline-shared (reference)"
+echo "Profiles: generic, django (auto-detected or set pipeline_profile in CLAUDE.md)"

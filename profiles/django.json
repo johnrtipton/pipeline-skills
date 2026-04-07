@@ -1,0 +1,50 @@
+{
+  "name": "django",
+  "description": "Django/Python projects — adds Django template security, pytest, and Python-specific checks",
+  "detection": [
+    {"file": "manage.py"},
+    {"file": "pyproject.toml", "contains": "django"}
+  ],
+  "environment": {
+    "smoke_test": "python -c 'import django'",
+    "venv_check": true,
+    "dependency_command": null
+  },
+  "security_patterns": [
+    "mark_safe() with unescaped interpolated values — must use escape() or format_html()",
+    "@csrf_exempt without documented justification",
+    "|safe template filter on user-controlled variables",
+    "mark_safe inside <script> blocks — HTML escaping is insufficient in JS context, use json.dumps() or allowlist validation",
+    "string concatenation in JS contexts — must use json.dumps() for JS string escaping",
+    "unescaped user input in Django template tags"
+  ],
+  "auto_reject_triggers": [
+    "f-string formatting in logger calls — use %s style",
+    "unguarded console.log in production JS",
+    "mark_safe() with unescaped interpolation",
+    "|safe on user-controlled variables",
+    "missing CHANGELOG.md update for feat/fix PRs"
+  ],
+  "stage_additions": {
+    "feature.4": [
+      {"action": "identify user-configurable values entering unescaped contexts (mark_safe, autoescape off, |safe, JS embedding) — plan input validation for each", "done": false}
+    ],
+    "feature.5": [
+      {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml [tool.pytest.ini_options] testpaths)", "done": false, "mandatory": true},
+      {"action": "if generating code/templates: tests must assert on OUTPUT CONTENT (correct syntax, imports, patterns), not just 'it ran without error'", "done": false},
+      {"action": "if generating code/templates: verify generated output compiles/parses (python -c 'import ast; ast.parse(open(f).read())' or similar)", "done": false},
+      {"action": "no silent exception handling in generated/scaffolded code — use logging not bare except:pass", "done": false}
+    ],
+    "bugfix.3": [
+      {"action": "if fix involves user-configurable values in unescaped contexts (mark_safe, autoescape off, |safe, JS embedding), plan input validation", "done": false}
+    ],
+    "bugfix.4": [
+      {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml)", "done": false, "mandatory": true}
+    ]
+  },
+  "docs": {
+    "changelog": true,
+    "changelog_file": "CHANGELOG.md",
+    "gallery_support": false
+  }
+}

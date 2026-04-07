@@ -148,23 +148,66 @@ Note: The harness does NOT self-approve PRs (GitHub blocks approving your own PR
 pipeline-skill/
 ├── pipeline.py                         # External harness — runs the stage loop
 ├── install.sh                          # Install skills into ~/.claude/skills/
+├── profiles/
+│   ├── generic.json                    # Framework-agnostic defaults
+│   └── django.json                     # Django/Python-specific checks
 ├── templates/
-│   ├── feature-state.json              # Feature pipeline template (15 stages)
+│   ├── feature-state.json              # Feature pipeline template (14 stages)
 │   ├── bugfix-state.json               # Bug fix pipeline template (12 stages)
-│   └── refactor-state.json             # Refactor pipeline template (12 stages)
+│   ├── refactor-state.json             # Refactor pipeline template (12 stages)
+│   └── ship-state.json                 # Ship pipeline template (10 stages)
 └── skills/
     ├── pipeline-shared/SKILL.md        # Shared procedures (reference)
-    ├── pipeline-feature/SKILL.md       # Feature pipeline skill
-    ├── pipeline-bugfix/SKILL.md        # Bug fix pipeline skill
-    ├── pipeline-refactor/SKILL.md      # Refactor pipeline skill
-    └── pipeline-auto/SKILL.md          # ROADMAP parser + task runner skill
+    ├── pipeline-next/SKILL.md          # Task picker from ROADMAP.md
+    ├── pipeline-run/SKILL.md           # Stage executor
+    └── pipeline-ship/SKILL.md          # Ship existing changes
 ```
 
 ### Two ways to use
 
 1. **`pipeline.py` (recommended)** — External harness enforces every stage. Each stage runs as a separate `claude -p` call. Stages can't be skipped.
 
-2. **Skills (`/pipeline-feature` etc.)** — Single-session mode. Claude Code reads the skill and executes all stages in one session. Simpler but stages may be skipped due to context compression. Best for small tasks where context continuity matters more than stage enforcement.
+2. **Skills (`/pipeline-next`, `/pipeline-run`, `/pipeline-ship`)** — Single-session mode. Claude Code reads the skill and executes all stages in one session. Simpler but stages may be skipped due to context compression. Best for small tasks where context continuity matters more than stage enforcement.
+
+## Profile System
+
+Profiles customize security checks, checklist items, and conventions for your framework. Three customization layers:
+
+### Layer 1: Built-in Profiles
+
+```bash
+# Auto-detects profile from project files (manage.py → django)
+python pipeline.py feature --task "Add endpoint" --project ~/my-project
+
+# Or specify explicitly
+python pipeline.py feature --task "Add endpoint" --project ~/my-project --profile django
+```
+
+**Available profiles:**
+- `generic` — Framework-agnostic: secrets, shell injection, eval/exec, raw SQL, XSS
+- `django` — Adds: mark_safe, csrf_exempt, |safe, pytest, f-string logger checks
+
+### Layer 2: Project CLAUDE.md
+
+Set `pipeline_profile: django` in your project's CLAUDE.md to auto-select a profile.
+
+### Layer 3: Per-repo `.pipeline/` Overrides
+
+Drop files in your project's `.pipeline/` directory:
+
+- **`.pipeline/profile.json`** — Extra security patterns, auto-reject triggers, or stage checklist items merged on top of the selected profile:
+  ```json
+  {
+    "security_patterns": ["custom pattern for this repo"],
+    "stage_additions": {
+      "feature.5": [
+        {"action": "verify dual-path wiring", "done": false, "mandatory": true}
+      ]
+    }
+  }
+  ```
+
+- **`.pipeline/feature-state.json`** — Complete template override for projects needing different stages.
 
 ## Customization
 
@@ -185,16 +228,18 @@ If the project has `docs/PULL_REQUEST_CHECKLIST.md`, the Code Review stage uses 
 
 ### Auto-Reject Triggers
 
-The Code Review stage flags these as critical issues:
+The Code Review stage flags these as critical issues (generic profile):
 - `print()` instead of project logging system
-- f-string formatting in logger calls
-- `console.log` without debug guards
 - Silent exception handling (`except: pass`)
 - No tests for new functionality
-- `mark_safe()` with unescaped interpolation
-- `|safe` on user-controlled variables
+- Tests reference modules/APIs that don't exist in the diff
 - Placeholder/stub code shipped as production
-- Missing CHANGELOG update for feat/fix PRs
+
+The Django profile adds: f-string loggers, `console.log` guards, `mark_safe()` interpolation, `|safe` on user vars, missing CHANGELOG.
+
+## Flexion Plugin
+
+Also published as a plugin for the [flexion-ai-claude-plugin](https://github.com/flexion/flexion-ai-claude-plugin) marketplace at `flexion-ai-pipeline/`. The plugin includes activation phrases for skill auto-discovery.
 
 ## Origin
 

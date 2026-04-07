@@ -216,7 +216,7 @@ Validate the project environment and create a fresh branch from upstream.
 
 4. **Dependencies**: Activate venv, run install command (`pip install -e .`, `uv sync`, `pip install -r requirements.txt`, or project-configured command).
 
-5. **Smoke test**: Run a minimal import check (e.g., `python -c 'import django'` for Django projects).
+5. **Smoke test**: Run a minimal import check (e.g., run the profile-configured smoke test command if set).
 
 6. **Gitignore audit**: Check if `.gitignore` contains rules that would block adding new source files (e.g., a rule like `components/` that matches `src/*/components/`). If found, note it so the Implementation stage can use `git add -f` for blocked paths. Common gotcha: overly broad directory rules that match nested source directories.
 
@@ -294,16 +294,11 @@ Scan files changed by this task for security vulnerabilities. Pre-existing issue
    — This is your **scope**. Only issues in these files can cause failure.
 
 2. **Scan changed files** for these patterns:
-   - `mark_safe` — must use `escape()` or `format_html()` for interpolated values
-   - `mark_safe` inside `<script>` blocks — HTML escaping (`conditional_escape`) is **insufficient** in JS context. User-controlled values interpolated inside `<script>` tags need allowlist validation (regex like `^[a-zA-Z0-9_-]+$`) or `json.dumps()`, not HTML entity escaping
-   - `@csrf_exempt` — CSRF protection disabled without justification
-   - `|safe` — template filter on user-controlled variables bypasses auto-escaping
-   - Raw SQL queries (string interpolation in SQL)
    - Hardcoded secrets, API keys, passwords
    - `shell=True` — command injection risk
-   - String concatenation in JS contexts — must use `json.dumps()` for JS string escaping
-   - Unescaped user input in template tags
+   - Raw SQL queries (string interpolation in SQL)
    - `eval()` or `exec()` with user-controlled input — even with restricted builtins
+   - Additional framework-specific patterns are loaded from the pipeline profile (e.g., Django profile adds `mark_safe`, `csrf_exempt`, `|safe` checks)
 
 3. **Broad codebase scan** (for context): grep the full codebase for the same patterns. Hits in files NOT in your scope are pre-existing — report as `IMPROVEMENT:` lines, do NOT let them influence your verdict.
 
@@ -330,7 +325,7 @@ Ensure all user-facing and developer documentation is complete, accurate, and we
 #### 1. Discover the project's docs structure
 
 Look for a documentation directory — common locations:
-- `docs/` with a `README.md` index (the djust pattern — organized by topic with guides/, components/, etc.)
+- `docs/` with a `README.md` index (organized by topic with guides/, components/, etc.)
 - `docs/` with mkdocs/sphinx config
 - Top-level `README.md` only
 
@@ -362,7 +357,7 @@ For new features or significant changes, determine what documentation users need
 #### 4. Component gallery / discovery
 
 If the project has a component gallery or auto-discovery system:
-- Add gallery examples for any new template tags or components
+- Add gallery examples for new components
 - Update discovery tests if they hardcode expected component lists
 - Verify the gallery renders new components correctly (if a `--dry-run` flag exists, use it)
 
@@ -475,17 +470,11 @@ Review the code changes in the current branch against the base branch.
 - Edge cases covered (error conditions, boundary cases)
 
 **Security**:
-- No `mark_safe()` with unescaped interpolated values — must use `escape()` or `format_html()`
-- No `|safe` template filter on user-controlled variables
-- No `@csrf_exempt` without documented justification
-- `json.dumps()` for values embedded in JavaScript strings (not HTML `escape()`)
 - No XSS, SQL injection, CSRF bypass, or secrets exposure
-- Template tags escape user input
+- Check profile-specific security patterns
 
 **Code Quality**:
 - No `print()` statements — use the project's logging system
-- No f-string formatting in logger calls — use `%s` style
-- No `console.log` in production JS without debug guards
 - No silent exception handling (`except: pass`)
 - Exception chaining (`raise X from e`)
 - Appropriate log levels (error/warning/info/debug)
@@ -498,30 +487,24 @@ Review the code changes in the current branch against the base branch.
 - Breaking changes documented with migration path
 
 **Performance**:
-- No N+1 queries or unnecessary database hits
+- Database query efficiency (if applicable)
 - No memory leaks or excessive allocations
 - Caching for expensive operations where appropriate
-- VDOM/rendering impact considered (if applicable)
 
 **Architecture**:
 - Follows project patterns and conventions
 - Single responsibility — focused functions and classes
 - No code duplication — shared logic properly abstracted
-- `reinitAfterDOMUpdate()` after DOM replacement (if applicable)
 
 ### Auto-Reject Triggers
 
 Flag as critical if any of these are found:
 - `print()` instead of logging
-- f-string in logger calls
-- Unguarded `console.log` in production JS
 - Silent exception handling (`except: pass`)
 - No tests for new functionality
 - Tests reference modules/APIs that don't exist in the diff
-- `mark_safe()` with unescaped interpolation
-- `|safe` on user-controlled variables
 - Placeholder/stub code shipped as production
-- Missing CHANGELOG.md update for feat/fix PRs
+- Additional auto-reject triggers from the pipeline profile
 
 For each finding, include: file and line number, severity (critical/warning/suggestion), description, suggested fix.
 
@@ -570,7 +553,7 @@ REVIEW
 
 ### Save Review Locally
 
-Also save the review to `pr/feedback/pr-<number>-<short-description>.md` if the project has a `pr/feedback/` directory (per the djust PR checklist convention).
+Also save the review to `pr/feedback/pr-<number>-<short-description>.md` if the project has a `pr/feedback/` directory.
 
 ### Gate
 - Output `REVIEW_COMPLETE` — this stage always passes (informational)
@@ -740,14 +723,7 @@ RETRO
 
 This keeps the retrospective attached to the PR for future reference.
 
-#### 3. Project Memory (if orchestrator is available)
-
-If the project uses djust-orchestrator memory, write key lessons:
-```bash
-python manage.py memory_write --level project --project <project> --append '<lesson>'
-```
-
-If not, check if the project has a `docs/LESSONS_LEARNED.md` or similar file and append there. If neither exists, the pipeline log and PR comment are sufficient — do not create new documentation files.
+Check if the project has a `docs/LESSONS_LEARNED.md` or similar file and append there. If not, the pipeline log and PR comment are sufficient — do not create new documentation files.
 
 ---
 

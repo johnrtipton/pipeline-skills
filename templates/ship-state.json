@@ -43,7 +43,7 @@
         {"action": "re-read full diff as if you are a code reviewer", "done": false, "mandatory": true},
         {"action": "correctness: does it do what it claims?", "done": false},
         {"action": "edge cases: empty inputs, large data, concurrent access?", "done": false},
-        {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false, "mandatory": true},
+        {"action": "check auto-reject triggers (per profile and generic: print vs logging, except:pass, no tests, phantom modules, stub code)", "done": false, "mandatory": true},
         {"action": "test coverage: are new code paths tested?", "done": false},
         {"action": "code quality: broad except, unused params, dead code", "done": false},
         {"action": "if issues found: fix them now, re-run tests", "done": false},
@@ -57,7 +57,7 @@
       "skip_if": "DOCS_ONLY",
       "checklist": [
         {"action": "read .pipeline-state/<branch>-changes.txt for changed files", "done": false},
-        {"action": "scan for mark_safe/csrf_exempt/|safe/raw SQL/secrets/shell=True/JS string escaping", "done": false},
+        {"action": "scan changed files for security patterns (per profile: secrets, injection, XSS, etc.)", "done": false},
         {"action": "check for XSS in any HTML output", "done": false},
         {"action": "output SECURITY_PASSED or SECURITY_FAILED", "done": false, "mandatory": true}
       ]
@@ -95,7 +95,7 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists. Step 2: Review for correctness, security (mark_safe/|safe/csrf_exempt/XSS/injection), testing gaps, code quality (print vs logging, f-string loggers, console.log guards, except:pass), docs (CHANGELOG updated), perf (N+1 queries), architecture. Flag auto-reject triggers. Step 3: Run project test suite, report pass/fail. Step 4: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 5 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Step 6: Output verdict.",
+      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists. Step 2: Review for correctness, security (XSS, injection, secrets exposure), testing gaps, code quality (print vs logging, except:pass), docs, perf, architecture. Flag auto-reject triggers. Step 3: Run project test suite, report pass/fail. Step 4: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 5 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Step 6: Output verdict.",
       "checklist": [
         {"action": "git diff against target branch", "done": false},
         {"action": "review: correctness, security, testing, quality, docs, perf, architecture", "done": false, "mandatory": true},

@@ -40,7 +40,6 @@
         {"action": "search codebase for relevant code paths", "done": false},
         {"action": "identify root cause (not just symptom)", "done": false, "mandatory": true},
         {"action": "propose targeted fix", "done": false},
-        {"action": "if fix involves user-configurable values in unescaped contexts (mark_safe, autoescape off, |safe, JS embedding), plan input validation", "done": false},
         {"action": "scope check — output SCOPE_EXPANDED if broader than spec", "done": false},
         {"action": "write diagnosis to .pipeline-state/<branch>-diagnosis.md so later stages can read it", "done": false, "mandatory": true}
       ]
@@ -51,11 +50,9 @@
       "verdict": null,
       "checklist": [
         {"action": "read .pipeline-state/<branch>-diagnosis.md for the diagnosis and proposed fix", "done": false, "mandatory": true},
-        {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml)", "done": false, "mandatory": true},
         {"action": "implement minimal focused fix", "done": false},
         {"action": "edge case checklist (null/empty/boundary/concurrent)", "done": false},
-        {"action": "dual-path wiring: if fix touches lifecycle/mount/events, verify BOTH websocket.py AND mixins/request.py are patched", "done": false},
-        {"action": "update CHANGELOG.md with fix: entry", "done": false, "mandatory": true},
+        {"action": "update CHANGELOG.md if project has one", "done": false},
         {"action": "git add -u + new files", "done": false},
         {"action": "git status clean", "done": false, "mandatory": true},
         {"action": "write list of all changed files to .pipeline-state/<branch>-changes.txt (git diff --name-only HEAD)", "done": false, "mandatory": true}
@@ -120,7 +117,7 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "You are reviewing PR #{pr_number} for a bug fix. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-diagnosis.md for the original diagnosis. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists. Step 2: Cross-ref diagnosis vs fix — verify root cause was addressed, not just symptom. Step 3: Review for correctness, security, testing (bug fix MUST have regression test), code quality, docs, perf. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
+      "subagent_prompt": "You are reviewing PR #{pr_number} for a bug fix. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-diagnosis.md for the original diagnosis. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists. Step 2: Cross-ref diagnosis vs fix — verify root cause was addressed, not just symptom. Step 3: Review for correctness, security (XSS, injection, secrets), testing (bug fix MUST have regression test), code quality, docs, perf. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict.",
       "checklist": [
         {"action": "read .pipeline-state/<branch>-diagnosis.md for diagnosis compliance check", "done": false},
         {"action": "git diff against target branch", "done": false},
@@ -128,7 +125,7 @@
         {"action": "cross-ref diagnosis vs fix — root cause addressed", "done": false, "mandatory": true},
         {"action": "verify regression test exists for the bug fix", "done": false, "mandatory": true},
         {"action": "review: correctness, security, testing, quality, docs, perf", "done": false},
-        {"action": "check auto-reject triggers (print/f-string loggers/console.log/except:pass/no tests/phantom modules/mark_safe/stub code/CHANGELOG)", "done": false},
+        {"action": "check auto-reject triggers (per profile and generic: print vs logging, except:pass, no tests, phantom modules, stub code)", "done": false},
         {"action": "run full test suite, report pass/fail", "done": false, "mandatory": true},
         {"action": "post review to GitHub: gh pr review --comment with formatted checklist and findings", "done": false, "mandatory": true},
         {"action": "save to pr/feedback/ if directory exists", "done": false},
