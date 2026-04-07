@@ -15,7 +15,7 @@
     "XSS in HTML output (unescaped user input)"
   ],
   "auto_reject_triggers": [
-    "print() instead of project logging system",
+    "print() or console.log() left in production code",
     "silent exception handling (except: pass)",
     "no tests for new functionality",
     "tests reference modules/APIs that don't exist in the diff",

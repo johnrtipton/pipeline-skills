@@ -20,7 +20,6 @@
   ],
   "auto_reject_triggers": [
     "f-string formatting in logger calls — use %s style",
-    "unguarded console.log in production JS",
     "mark_safe() with unescaped interpolation",
     "|safe on user-controlled variables",
     "missing CHANGELOG.md update for feat/fix PRs"
