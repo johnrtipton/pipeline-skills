@@ -153,7 +153,7 @@ def apply_profile(state: dict, profile: dict) -> dict:
     # Inject security patterns into security check stages
     security_patterns = profile.get("security_patterns", [])
     if security_patterns:
-        pattern_text = ", ".join(security_patterns[:6])  # Keep concise
+        pattern_text = ", ".join(security_patterns[:10])
         for stage in state["stages"].values():
             for item in stage.get("checklist", []):
                 if "scan changed files for security patterns" in item.get("action", ""):
@@ -162,7 +162,7 @@ def apply_profile(state: dict, profile: dict) -> dict:
     # Inject auto-reject triggers into subagent prompts
     auto_reject = profile.get("auto_reject_triggers", [])
     if auto_reject:
-        trigger_text = ", ".join(auto_reject[:6])
+        trigger_text = ", ".join(auto_reject[:10])
         for stage in state["stages"].values():
             prompt = stage.get("subagent_prompt", "")
             if "auto-reject triggers" in prompt.lower() and "{profile_triggers}" in prompt:
