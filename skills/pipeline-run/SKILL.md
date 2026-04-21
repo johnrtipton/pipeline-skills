@@ -31,18 +31,185 @@ If no incomplete state file exists (no `.pipeline-state/*.json` with `completed_
 1. If `--milestone` or `--priority` or `--feature` was specified, run the **pipeline-next** skill to pick a task and create the state file.
 2. If no flags specified, tell the user: "No incomplete pipeline found. Run `/pipeline-run --milestone v0.4.0` to pick a task from the roadmap."
 
-**State file templates** are in the pipeline plugin's `templates/` directory (locate via the directory containing `pipeline.py`, or `PIPELINE_SKILL_DIR` env var):
-- `templates/feature-state.json`
-- `templates/bugfix-state.json`
-- `templates/refactor-state.json`
+**State file templates** — check for project-local templates first, then fall back to the pipeline skill's templates:
+
+1. **Project-local** (preferred): `.pipeline-templates/feature-state.json` (or `bugfix-state.json`, `refactor-state.json`) in the project root. Projects customize these to add stages, subagent prompts, and project-specific checklists.
+2. **Skill default** (fallback): `templates/` directory in the pipeline skill's directory (locate via `PIPELINE_SKILL_DIR` env var or the directory containing `pipeline.py`).
+
+If a project-local template exists, **always use it** — it overrides the default.
 
 ## Autonomous Execution
 
 When `--all`, `--all-milestones`, or `--group` is specified, the pipeline runs **fully autonomously**. Do NOT pause to ask the user if they want to continue between tasks or groups. The flag itself is the user's confirmation. Only stop on failure.
 
+## Stage 1: Branch and Environment Setup
+
+The Environment Check stage needs care when local `main` is ahead of `origin/main`:
+
+1. **Check for unpushed commits**: `git log origin/main..main --oneline`. If there are any, push main first (`git push origin main`) before creating the feature branch. Otherwise the branch will be based on stale code.
+2. **Create the branch**: `git checkout -B {branch_name} origin/main` (now that origin/main is current).
+3. **Install dependencies**: Always re-run `uv pip install -r requirements.txt` (or the project's equivalent) after branching. The branch may have different dependency versions than what's currently installed in `.venv`.
+
 ## Parallel Stages
 
-Stages 6 (Test Execution), 7 (Self-Review), and 8 (Security Check) are independent read-only stages. **Run them in parallel** by spawning 3 agents simultaneously. This cuts wall-clock time significantly. Wait for all 3 to complete before proceeding to Stage 9.
+Stages named "Test Execution", "Self-Review", and "Security Check" are independent read-only stages. **Run them in parallel** by spawning 3 agents simultaneously. This cuts wall-clock time significantly. Wait for all 3 to complete before proceeding to the next stage.
+
+To identify parallel stages: scan the state file for stages with these exact names (regardless of stage number). Do NOT hardcode stage numbers — projects may have different stage counts.
+
+### When parallel stages fail
+
+If multiple parallel stages fail (e.g., both Self-Review and Security Check find issues), **combine all findings into a single fix pass**:
+
+1. Collect findings from ALL failed parallel stages
+2. Spawn ONE fixer agent with the combined finding list
+3. After fixes, mark all failed parallel stages as `passed` (with `_AFTER_FIXES` suffix on verdict)
+4. Do NOT re-run each failed stage individually — that wastes time. The Code Review stage (Stage 11) will catch anything the fix missed.
+
+## Conditional Stages
+
+Stages with a `"_note"` field containing "SKIP if" should be evaluated:
+- If the skip condition is met (e.g., no findings from review), mark the stage as `skipped` with a note
+- The stage's checklist may include a "skip" action as the first item — check it before proceeding
+
+### Stages that MUST NEVER be skipped
+
+Regardless of conditions, time pressure, or the pipeline executor's own
+reasoning, these stages are **load-bearing quality gates** and cannot be
+skipped under any circumstances:
+
+- **Stage 11 — Code Review** — catches defects implementation misses. Observed
+  case: PR #91 had Stage 11 skipped to save time; when run manually after
+  the fact it found a race condition (`select_for_update` missing), unhandled
+  DocuSign exceptions, and zero test coverage for a new mutation handler.
+- **Stage 13 — Re-Review** — verifies that findings from Stage 11 were
+  actually addressed, not just claimed addressed. May be marked `skipped`
+  ONLY when Stage 11 produced zero 🔴 and zero 🟡 findings (the `skip_if`
+  condition in the template). Never skipped "to save time" when findings exist.
+- **Stage 15 — Retrospective** — milestone learning lives here. Skipping it
+  is how lessons get lost between milestones.
+
+If the executor finds itself reasoning "I'll skip Stage 11/13/15 because the
+change is small / I already reviewed it / we're in a hurry" — STOP. That
+reasoning is the failure mode. Run the stage.
+
+## Gate Check (Integrity Audit)
+
+Before spawning any stage agent, verify that all prior stages completed properly.
+This prevents skipping stages (accidentally or deliberately) and catches backfilled
+state files where `status: passed` was set without actually running the stage.
+
+**Run this check every iteration**, between Step 2 (find next stage) and Step 3 (spawn agent):
+
+```
+for each prior_stage (1 to current_stage - 1):
+    if prior_stage.status not in ("passed", "skipped"):
+        STOP — "Stage {N} ({name}) was not completed. Run it before proceeding."
+    
+    if prior_stage.status == "passed" and prior_stage.verdict is None:
+        STOP — "Stage {N} has status=passed but no verdict. 
+               This looks backfilled. Re-run the stage properly."
+```
+
+**Artifact verification** for critical stages (check AFTER the stage is marked passed):
+
+| Stage name | Required artifact |
+|-----------|-------------------|
+| Commit & PR | `pr_number` and `pr_url` set in state file |
+| Code Review | PR has a review comment (check `gh pr view $PR --json comments`) |
+| Retrospective | PR has a retro comment (check `gh pr view $PR --json comments`) |
+| Merge PR | PR state is `MERGED` (check `gh pr view $PR --json state`) |
+
+If artifact verification fails: mark the stage back to `pending` and re-run it.
+
+**Close-without-code path**: If investigation reveals the issue doesn't need a code
+change (already fixed, by-design, config issue), the pipeline supports a short-circuit:
+
+1. Set `pipeline_type` to `"investigation"` in the state file
+2. Skip stages: Implementation, Test Execution, Self-Review, Security Check, Commit & PR, Merge PR
+3. Required stages: Environment Check, Planning (investigation), Documentation (close issue with comment), Retrospective
+4. The "Documentation" stage should close the GitHub issue with a detailed explanation
+
+## Pre-Commit Checklist
+
+Before running `git commit` in the Implementation or Commit & PR stage, always run
+the project's linters and formatters **against the exact staged files**, not the
+whole tree:
+
+```bash
+# 1. Stage the files you intend to commit FIRST.
+git add <file1> <file2> ...
+
+# 2. Run formatters + linters scoped to staged files only.
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# Rust — only if any staged .rs files:
+if echo "$STAGED" | grep -q '\.rs$'; then cargo fmt; fi
+
+# Python — scope to staged .py files:
+PY=$(echo "$STAGED" | grep '\.py$' || true)
+if [ -n "$PY" ]; then ruff check $PY --fix && ruff format $PY; fi
+
+# JS — scope to staged .js files (not the whole tree; pre-existing
+# issues in unrelated files will fail the hook otherwise):
+JS=$(echo "$STAGED" | grep '\.js$' || true)
+if [ -n "$JS" ]; then npx eslint --fix $JS; fi
+
+# 3. Re-stage any files the formatters touched, then commit.
+git add <changed-files>
+git commit -m "..."
+```
+
+**Why scope to staged files?** Observed in djust PR #814 (v0.5.0): running
+`ruff check .` / `eslint` across the whole tree tripped the pre-commit hook on
+**pre-existing errors in unrelated files**, which then looped with the hook's
+stash-restore cycle — six commit attempts to land one PR. Scoping eliminates this.
+
+This prevents the common pattern of 3-5 failed commit attempts due to formatting hooks.
+
+## Duplicate PR Prevention
+
+Before creating a PR in the Commit & PR stage, check if one already exists:
+
+```bash
+gh pr list --head $BRANCH_NAME --state open --json number,url
+```
+
+If a PR already exists, use it (set `pr_number` and `pr_url` from the existing PR)
+instead of creating a duplicate.
+
+## State-File Gate (the #840 prevention)
+
+**Before ANY of these actions**, the executor MUST verify a state file exists
+for the current branch:
+
+- `git checkout -B <feature-branch>` (branch creation)
+- `git commit` on a feature branch (the first commit of the pipeline's work)
+- `gh pr create` (PR opening)
+
+Check:
+
+```bash
+STATE_FILE=$(ls .pipeline-state/*.json 2>/dev/null | xargs grep -l "\"branch_name\": \"$(git branch --show-current)\"" 2>/dev/null | head -1)
+if [ -z "$STATE_FILE" ]; then
+    echo "ERROR: no pipeline state file for branch $(git branch --show-current)."
+    echo "Run /pipeline-next first to create one, or /pipeline-ship if starting"
+    echo "from an existing working-tree."
+    exit 1
+fi
+```
+
+If no state file is found, **the executor must STOP** and run pipeline-next
+first. Do not proceed with `gh pr create` — the retroactive Stage 11 that the
+user will inevitably ask for after merge is more expensive than running
+pipeline-next upfront.
+
+**Why this gate exists**: PR #840 in djust (v0.5.1 form-polish batch) was
+shipped without a state file. A retroactive Stage 11 review surfaced 2
+must-fix defects (IME composition bug, push-event namespace inconsistency)
+that would have reached production. Root cause was a missing mechanical
+gate; awareness of the Stage 7-vs-11 delta was not sufficient — it had
+already been documented in the v0.5.0 milestone retro and in PR #837's
+retro, and #840 fell into the trap anyway.
 
 ## The Loop
 
@@ -51,6 +218,7 @@ Repeat these steps until all stages are done:
 ```
 1. READ the state file from .pipeline-state/
 2. FIND the next stage where status != "passed" and status != "skipped"
+2b. RUN GATE CHECK on all prior stages (see above)
 3. SPAWN an agent to execute that stage
 4. COLLECT the agent's output and extract the verdict
 5. UPDATE the state file (checklist items, verdict, status)
@@ -144,6 +312,14 @@ stage["verdict"] = "<extracted verdict>"
 state["current_stage"] = next_stage_number
 state["pr_number"] = extracted_pr_number  # if found
 state["pr_url"] = extracted_pr_url  # if found
+
+# Track review findings (if the state file has a review_findings field)
+# After Code Review stage: extract 🔴/🟡 findings from agent output and store them
+# After Address Findings stage: verify each finding was addressed
+# After Re-Review stage: set review_findings.all_addressed = true/false
+if "review_findings" in state and stage["name"] == "Code Review":
+    # Parse findings from agent output and store for tracking
+    pass  # Implementation reads from pr/feedback/ file
 ```
 
 Write the updated JSON back to the state file.
@@ -175,6 +351,43 @@ When all stages are passed/skipped:
 ═══════════════════════════════════════════
 ```
 
+## Post-Completion Housekeeping
+
+After each pipeline completes (before moving to the next task in `--all` mode):
+
+### 1. Create GitHub issues for deferred findings
+
+If the Code Review stage found 🟡 should-fix items that were NOT addressed before merge (i.e., they appear in `review_findings.should_fix` but `all_addressed` is false, or the re-review noted items were deferred), create a GitHub issue for each:
+
+```bash
+gh issue create --title "tech-debt: <finding summary>" \
+  --body "From PR #<number> code review. <finding detail>" \
+  --label "tech-debt"
+```
+
+This prevents deferred findings from silently accumulating in retro files.
+
+### 2. Check for milestone retro trigger
+
+After the pipeline completes, check whether this was the last task in the milestone:
+
+```bash
+# Count remaining incomplete tasks for this milestone in ROADMAP.md
+grep "| v<milestone>" ROADMAP.md | grep -v "✅" | grep -v "~~" | grep -v "^|.*—" | wc -l
+```
+
+If zero tasks remain (or the user specified this is a milestone boundary):
+- Remind the user: "Milestone vX.Y.Z appears complete. Run `/pipeline-retro --milestone vX.Y.Z` to write the milestone retrospective and update the Action Tracker."
+
+### 3. Push main if needed
+
+If main has unpushed commits (from the merge), push them:
+```bash
+git log origin/main..main --oneline | head -1
+# If non-empty:
+git push origin main
+```
+
 ## After Completion — Continue to Next Task (--all mode)
 
 If `--all` was specified with `--milestone` (and optionally `--priority`):
@@ -188,10 +401,35 @@ This is the **outer loop**:
 while true:
     1. Run pipeline-next with filters → picks task, creates state file
     2. If no task found → break (all done)
-    3. Run the stage loop (inner loop) → completes all stages
-    4. Print task summary
-    5. Go to 1
+    3. ASSERT: ls .pipeline-state/*.json includes a file for the branch
+       pipeline-next just picked. If not → STOP with error
+       "Outer loop bug: pipeline-next did not create a state file."
+    4. Run the stage loop (inner loop) → completes all stages
+    5. Print task summary
+    6. Go to 1
 ```
+
+### Outer-loop integrity (the #840 failure mode)
+
+The outer loop above is the program. The common failure is for the operator
+(human or LLM) to complete iteration 1 correctly (full pipeline-next →
+state file → stages → merge → retro) and then treat iteration 2 as a
+"continuation" rather than a fresh iteration — skipping pipeline-next
+and starting implementation directly on a new branch without a state
+file.
+
+**Observed cost** (djust PR #840, v0.5.1 form-polish batch): the operator
+finished iteration 1 correctly, then created a new feature branch
+directly and ran implementation/commit/PR without a state file. Stage 11
+(Code Review) was never spawned as a subagent. When the user asked
+"did we use pipeline-run for #840?", a retroactive Stage 11 review
+surfaced 2 real must-fix defects that would have shipped: IME composition
+not guarded in a keydown handler (CJK correctness bug), and a push-event
+namespace inconsistency (wire-protocol back-compat trap).
+
+**Hard rule**: iteration 2+ MUST re-run pipeline-next before any code is
+written. If a state file does not exist for the branch, pipeline-run
+must refuse to execute stages against that branch.
 
 Print a milestone summary when all tasks are done:
 ```
@@ -263,6 +501,29 @@ On resume (`/pipeline-run --all-milestones` after a failure or interruption):
 5. Within that milestone, the `--all` logic handles resuming from the incomplete task
 
 This means `--all-milestones` is always safe to re-run — it picks up where it left off.
+
+---
+
+## Review Quality Rules
+
+Code Review and Retrospective stages must meet minimum depth requirements.
+
+**Code Review** must include:
+- At least 2 specific line-number citations from the diff
+- At least 1 question or concern (even if minor)
+- Statement of what edge cases were considered
+
+If the review comment is under 100 words, mark it `REVIEW_INSUFFICIENT` and
+re-run with: "Your review was too brief. Cite specific lines, raise at least
+one concern, and explain what edge cases you checked."
+
+**Retrospective** must include:
+- At least one "what could be improved" item that is specific (not generic)
+- Reference to how this task's findings relate to previous tasks in the milestone
+
+**After 3+ tasks in `--all` mode**, print: "3 tasks completed. Consider
+having the user review the PRs before continuing." The user can say "continue"
+to proceed.
 
 ---
 
