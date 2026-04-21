@@ -36,17 +36,27 @@ Use this when you've been coding interactively and want to formalize, review, an
 ### Step 0: Initialize
 
 1. Detect the project: `git rev-parse --show-toplevel`
-2. Check for existing changes:
+2. **Worktree-staleness check** — if `git status` shows many deleted files against HEAD (`^ D ` lines) AND HEAD is a recent rebase/fast-forward, the worktree is stale from a pre-rebase populate. Sync before proceeding:
+   ```bash
+   STALE_D=$(git status -s | grep -c '^ D ')
+   if [ "$STALE_D" -gt 5 ]; then
+       echo "WARNING: $STALE_D deleted-against-HEAD entries — worktree appears stale."
+       echo "If there is no genuine WIP, run: git reset --hard HEAD"
+       echo "Otherwise stash WIP first."
+   fi
+   ```
+   Observed cost: djust PR #836 pipeline-ship found 30+ stale `D` entries because the worktree was populated before the branch was rebased onto current main; had to `git reset --hard HEAD` before Stage 1 inventory was meaningful. A dozen `D` entries on a branch that claims to add code is a strong staleness signal.
+3. Check for existing changes:
    - `git status -s` — must have modified/added/untracked files OR recent commits not on target
    - If no changes found, abort: "Nothing to ship."
-3. Determine branch:
+4. Determine branch:
    - If already on a feature branch (not main/master): use it
    - If on main: create a new branch from `--branch` or auto-generate
-4. Determine description:
+5. Determine description:
    - If `--description` provided: use it
    - Otherwise: read the diff and generate a one-line summary
-5. Create state file:
-   - Read template from the pipeline plugin's `templates/ship-state.json` (locate via directory containing `pipeline.py`, or `PIPELINE_SKILL_DIR` env var)
+6. Create state file:
+   - Read template from the pipeline plugin's `templates/ship-state.json` (locate via directory containing `pipeline.py`, or `PIPELINE_SKILL_DIR` env var). Project-local `.pipeline-templates/ship-state.json` overrides the default — see pipeline-next for the override convention.
    - Fill in: `task_description`, `branch_name`, `pr_target_branch`, `project_path`, `started_at`
    - Write to `.pipeline-state/<branch-name>.json`
    - Ensure `.pipeline-state/` is in `.gitignore`
