@@ -75,14 +75,23 @@ Print the proposed groups with `--list --group`. Without `--list`, pick the high
 
 ### 7. Create the state file
 
-Read the template file DIRECTLY:
+Read the template file — **check project-local templates first**:
 
 ```bash
-# Templates are in the pipeline-skill's templates/ directory.
-# Locate via: the directory containing pipeline.py, or PIPELINE_SKILL_DIR env var.
-# For features:  templates/feature-state.json
-# For bugfixes:  templates/bugfix-state.json
-# For refactors: templates/refactor-state.json
+# 1. Check for project-local template (preferred — has project-specific stages/prompts):
+#    .pipeline-templates/feature-state.json
+#    .pipeline-templates/bugfix-state.json
+#    .pipeline-templates/refactor-state.json
+#
+# 2. Fall back to the pipeline-skill's templates/ directory:
+#    Locate via: the directory containing pipeline.py, or PIPELINE_SKILL_DIR env var.
+#    templates/feature-state.json
+#    templates/bugfix-state.json
+#    templates/refactor-state.json
+#
+# Project-local templates override skill defaults when they exist.
+# Projects customize them to add stages (e.g., Re-Review), subagent prompts,
+# and project-specific checklists.
 ```
 
 **For a single task:** Copy template, fill in task_description, branch_name, etc.
