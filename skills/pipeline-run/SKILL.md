@@ -339,6 +339,36 @@ If a stage returns a FAILED verdict:
 ## On Completion
 
 When all stages are passed/skipped:
+
+### MANDATORY retro-artifact gate (before setting `completed_at`)
+
+Run this check **every time** before `completed_at` is set or `PIPELINE_COMPLETE`
+is reported:
+
+```bash
+# Must return 1+ — at least one comment from the pipeline user (not a bot)
+COUNT=$(gh pr view $PR_NUMBER --json comments \
+  -q '[.comments[] | select(.author.login != "github-actions" and (.author.login | startswith("dependabot") | not))] | length')
+if [ "$COUNT" -lt 1 ]; then
+    echo "FAIL: retro not posted on PR #$PR_NUMBER — do not set completed_at"
+    # Re-run retro stage
+    exit 1
+fi
+```
+
+Why this gate exists: observed three drain iterations (djust PRs #946, #955, #956)
+where the subagent completed merge + issue-closes + state-file update but dropped
+the retro-comment post. Root cause was subagent returning control to parent after
+invoking Monitor for CI poll. Without this gate, retro dropout is invisible —
+the state file shows `completed_at` and the outer loop proceeds to the next task.
+
+**Fix pattern** when the gate fails:
+1. Write the retro file (`pr/feedback/retro-<N>.md`) if it doesn't exist yet
+2. Post via `gh pr comment $PR_NUMBER --body "$(cat pr/feedback/retro-<N>.md)"`
+3. Verify the gate passes, THEN set `completed_at`
+
+### After the retro gate passes
+
 - Set `completed_at` to current timestamp
 - Print summary:
 ```
