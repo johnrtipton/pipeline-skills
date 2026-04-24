@@ -169,5 +169,7 @@ The user's workflow becomes:
 /pipeline-drain --milestone v0.4.3
 # ... wait for everything to complete ...
 /pipeline-retro --milestone v0.4.3
-/djust-release 0.4.3
+# then cut a release with your repo's own release tooling:
+#   git tag v0.4.3 && git push --tags
+#   (or /your-release-skill 0.4.3 if you have one)
 ```
