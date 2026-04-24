@@ -33,6 +33,102 @@ extracts verdict from output → updates state file → repeats for next stage
 
 **Verdict system:** The harness scans Claude's output for verdict strings (e.g., `TESTS_PASSED`, `REVIEW_FAILED`, `PR_MERGED`). FAILED always overrides PASSED. Failed stages halt the pipeline for `--resume`.
 
+## Why the state file is the program (instruction rot is the real enemy)
+
+The most important design decision isn't the stage count or the verdict system — it's that **the stages live in a JSON state file the LLM has to tick off**, not in the skill prompt itself. The rationale is worth making explicit because it shapes every other design choice.
+
+### The problem: LLM instructions rot over a long conversation
+
+A skill prompt is loaded once at session start. As the conversation grows (tool results, file reads, code diffs, intermediate analysis), the original instructions get pushed further from the model's active attention. By the time the model reaches Stage 11 of a 15-stage pipeline, the Stage 5 hard gates might as well be unread. Four well-documented LLM failure modes drive this:
+
+- **Attention dilution** — earlier tokens compete with hundreds of recent tokens
+- **Summarization loss** — context compression drops detail from the original prompt
+- **Rationalization drift** — after many tool calls, the model invents permission to skip steps ("I already covered that," "this case doesn't need it")
+- **Plausible-sounding shortcuts** — a tired model writes a PR description and calls the pipeline "done" without running the final review/retro stages
+
+No amount of "MANDATORY" or "CRITICAL" or "YOU MUST" in the original skill prompt fixes this. The instruction is gone by the time it's needed.
+
+### The solution: make the state file the program
+
+Every pipeline run creates `.pipeline-state/<branch>.json` — a complete, persistent, versioned record of every stage and every mandatory checklist item. The model cannot advance a stage without:
+
+1. **Reading the current state file from disk** — fresh tokens, not cached from 50 tool calls ago
+2. **Locating the next pending stage and its checklist**
+3. **Executing each checklist item with `"done": false` → `"done": true`**
+4. **Writing the updated state file back to disk**
+5. **Setting the stage's `verdict` and `status: "completed"` before moving on**
+
+If the model is unsure what a specific checklist item actually requires, it **re-reads the skill file** — pulling the full definition back into active context rather than guessing from a half-remembered instruction.
+
+The framing the `pipeline-run` skill itself uses:
+
+> This skill is a tiny loop. **The state file is the program. You are the executor.**
+
+That framing is intentional. The state file is data; the model is an interpreter. Every iteration of the loop is short-lived — read state, execute next checklist item, write state — so instruction rot cannot accumulate.
+
+### Why this matters for auditability
+
+Other AI-coding approaches rely on the model remembering its orders. This harness doesn't. Durability comes from forcing the model to **re-read fresh instructions at every stage boundary** and **record commitment in a format that can be audited after the fact**. A reviewer can open any `.pipeline-state/<branch>.json` and see exactly which checklist items the model checked off, when, and with what verdict.
+
+This is also the reason post-PR stages (Code Review, Re-Review, Retrospective) run as **isolated subagents via `"run_as": "subagent"` + `subagent_prompt`**: a fresh agent with no conversation history forces a clean read of the PR, the checklist, and the diff — immune to the biases that would build up in the implementing agent's context.
+
+### Design principle
+
+Don't trust the model to remember. Build a structured artifact the model has to interact with. Let the artifact — not the skill prompt — be the authority.
+
+## Capture everything, block nothing (the learning-channel design)
+
+The most valuable information in a pipeline run is the stuff that surfaces *during* implementation and retro — accidental discoveries a traditional dev process would lose. When a model is mid-implementation on Feature A, it frequently notices things that are out-of-scope: a field missing a `db_index`, a form that silently discards data, a template typo, a test file that's outside the CI path, a security gap tangential to the current change. Without a capture channel, two bad things happen:
+
+1. **Perfectionist mode** — the model stops Feature A to fix everything it sees. The PR sprawls, the batch-size limit breaks, a 30-minute feature becomes a 3-hour yak-shave.
+2. **Ship-and-forget mode** — findings never get written down. Same bug rediscovered by three subsequent PRs; knowledge accumulated during implementation evaporates.
+
+The harness solves this with **three explicit asynchronous escape hatches**, none of which stop the current PR:
+
+| Channel | Where it lives | Processed by |
+|---------|---------------|--------------|
+| **PR retro** (`pr/feedback/retro-{N}-*.md`) | Written in Stage 15 of every pipeline. "What to improve" + "KB updates needed" sections capture ambient findings | `/pipeline-retro --reconcile` (at milestone end) |
+| **GitHub issue** (label: `tech-debt`) | Stage 15 creates an issue for every deferred finding — a 15-second write that preserves the context | `/pipeline-drain --label tech-debt` (tech-debt sprint) |
+| **RETRO.md Action Tracker** | Single source of truth. Each row: finding → source PR → GitHub issue → status | Human review / `/pipeline-retro --reconcile` |
+
+A finding noticed during Feature A goes into Feature A's retro ("tangential finding: X needs Y"). At the next milestone retro, `/pipeline-retro --reconcile` scans every PR retro, deduplicates, and creates GitHub issues for anything still open. Weeks later, `/pipeline-drain --label tech-debt` batches those issues into a focused cleanup pass.
+
+**The rule this replaces**: "fix it now" vs "ignore it." Neither is right. The right rule is: **ship what's in scope, capture what's out of scope, process captured items in dedicated sprints.** Stage 15 takes 30–60 seconds per finding to write a GitHub issue. The PR merges on schedule. The finding isn't lost. The next tech-debt sprint is able to batch similar findings together (e.g., "audit all templates for FK dot-notation" is 40 template edits in one PR, not 40 drive-by fixes across unrelated features).
+
+### Retrospective structure
+
+Every `pr/feedback/retro-{N}-*.md` should have five sections:
+
+1. **What Worked** — patterns to repeat (so successful approaches don't get forgotten either)
+2. **What Didn't Work** — bugs, wrong assumptions, dead-end approaches
+3. **What to Improve** — candidate CLAUDE.md rules, new Stage 5 gates, or checklist items
+4. **Knowledge Base Updates Needed** — domain facts discovered mid-implementation
+5. **Review Stats** — findings found, fixed, deferred, re-review rounds
+
+The "Knowledge Base Updates Needed" section is especially load-bearing when the project keeps a separate KB (see the three-phase process pattern below). Domain facts discovered mid-implementation flow through the retro → the milestone retro → a KB patch → the next feature benefits from the correction. No PR blocks, no knowledge lost.
+
+## The three-phase process (recommended upstream workflow)
+
+This harness assumes a three-phase project workflow. The harness itself only implements Phase 3, but works best when Phases 1 and 2 are in place:
+
+```
+PHASE 1: KNOWLEDGE BASE
+  RFP / specs / domain research → a navigable, AI-readable KB
+  (e.g., knowledgebase/ directory, Karpathy LLM Wiki pattern)
+       ↓
+PHASE 2: LIVING ROADMAP
+  KB + priorities → ROADMAP.md with per-feature priority + status + milestone
+  Rewritten after every retro (reorder, add, defer, split)
+       ↓
+PHASE 3: EXECUTE VIA THE PIPELINE
+  /pipeline-next → /pipeline-run → /pipeline-retro
+       ↕
+  Feedback loops: retros → CLAUDE.md rules → Stage-5 gates →
+                  tech-debt GitHub issues → /pipeline-drain → ROADMAP reorder
+```
+
+The three phases never freeze. The KB gets new files when gaps are discovered. The ROADMAP gets reordered after retros. The pipeline skills themselves evolve — new hard gates added every time an incident proves they're needed. A new project adopting this harness should scaffold all three phases; skipping Phase 1 or 2 leaves the pipeline with no grounding for the LLM's domain decisions.
+
 ## Profile System (3-layer customization)
 
 Profiles customize security checks, checklist items, and conventions per framework. Three layers, each extending the previous:
