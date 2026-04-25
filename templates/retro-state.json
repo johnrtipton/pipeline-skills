@@ -1,0 +1,122 @@
+{
+  "pipeline_type": "retro",
+  "milestone": "",
+  "project_path": "",
+  "started_at": "",
+  "completed_at": null,
+  "current_stage": 1,
+  "pr_numbers": [],
+  "per_pr_findings": {},
+  "findings": [],
+  "new_tracker_rows": [],
+  "new_github_issues": [],
+  "closed_rows": [],
+  "stages": {
+    "1": {
+      "name": "Identify milestone PRs",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "if --milestone given, use it; else read RETRO.md to find latest milestone with completed work but no retro entry", "done": false, "mandatory": true},
+        {"action": "list merged PRs in milestone window via gh pr list and/or .pipeline-state/*.json completed_at", "done": false},
+        {"action": "record pr_numbers in state file (top-level array)", "done": false, "mandatory": true},
+        {"action": "output MILESTONE_IDENTIFIED with the milestone tag and PR count", "done": false, "mandatory": true}
+      ]
+    },
+    "2": {
+      "name": "Read per-PR retros",
+      "status": "pending",
+      "verdict": null,
+      "_note": "Per-PR retros may live as pr/feedback/retro-{N}.md OR as GitHub PR comments. Both must be checked. Skipping this step is the #1 way the milestone retro misses the technical-design lessons the per-PR retro author already extracted.",
+      "checklist": [
+        {"action": "for each PR in pr_numbers: try pr/feedback/retro-{N}.md first; if missing, fetch GitHub PR retro comment via gh pr view <N> --json comments", "done": false, "mandatory": true},
+        {"action": "if a PR has neither a file nor a comment retro: flag as RETRO_GATE_VIOLATION (the pipeline-run retro-artifact gate leaked); record in state and continue, but require backfill in stage 4", "done": false, "mandatory": true},
+        {"action": "for each PR retro: extract What Worked Well, What Didn't Work, What to Improve, Knowledge Base Updates Needed, Recurring Issue Tracker", "done": false, "mandatory": true},
+        {"action": "record per_pr_findings in state file (one entry per PR, keyed by PR number)", "done": false, "mandatory": true},
+        {"action": "output PR_RETROS_READ with the count of retros found and the count of gate violations", "done": false, "mandatory": true}
+      ]
+    },
+    "3": {
+      "name": "Write milestone entry",
+      "status": "pending",
+      "verdict": null,
+      "_note": "Synthesize ACROSS PRs — don't just list each PR's findings separately. Aim for 3-6 milestone-level findings. Every finding gets an Action taken: line that will be classified in stage 3.5.",
+      "checklist": [
+        {"action": "synthesize findings across PRs into 3-6 milestone-level findings", "done": false, "mandatory": true},
+        {"action": "every finding has an explicit 'Action taken:' line", "done": false, "mandatory": true},
+        {"action": "Insights / Review Stats / Process Improvements / Open Items sections written", "done": false, "mandatory": true},
+        {"action": "record findings list in state file (one entry per finding with title and action_taken_text)", "done": false, "mandatory": true},
+        {"action": "output MILESTONE_ENTRY_DRAFTED with finding count", "done": false, "mandatory": true}
+      ]
+    },
+    "3.5": {
+      "name": "Verification gate: classify Action taken: lines",
+      "status": "pending",
+      "verdict": null,
+      "_note": "THIS IS THE LOAD-BEARING GATE. Writing prose in RETRO.md is Step 3 (synthesis). Filing actions is Step 4. If your Action taken: line is the prose itself, the action is missing — you cannot pass this gate by re-reading your own RETRO.md text and calling it an action. Every finding must classify as one of: diff | skill_update | tracker_row | closed. Anything else is prose_only and fails the gate.",
+      "checklist": [
+        {"action": "for each finding in state.findings: classify Action taken: line as exactly one of: diff | skill_update | tracker_row | closed | prose_only", "done": false, "mandatory": true},
+        {"action": "diff = a specific file:line + change description (e.g. 'Added _setFormPending helper at python/djust/static/djust/src/09-event-binding.js:127.'); commit must already exist or be queued for stage 6", "done": false, "mandatory": true},
+        {"action": "skill_update = a specific path to a SKILL.md or CLAUDE.md plus the section heading edited", "done": false, "mandatory": true},
+        {"action": "tracker_row = 'Open — tracked in Action Tracker #N (GitHub #NNN)' with both numbers present (filled in by stage 4)", "done": false, "mandatory": true},
+        {"action": "closed = 'Closed — <reason>' where reason references a PR/commit/test that already covers it", "done": false, "mandatory": true},
+        {"action": "prose_only = anything else: 'captured here as a milestone finding', 'pattern observation', 'documented in this retro', 'worth canonicalizing later', 'no code change' alone, 'pattern documented in CHANGELOG' without a diff reference, etc.", "done": false, "mandatory": true},
+        {"action": "record action_classifications in state file (finding_index -> classification)", "done": false, "mandatory": true},
+        {"action": "GATE: if any finding classifies as prose_only, the gate FAILS — do not advance to stage 4. Either (a) convert the finding to a tracker_row by filing it in stage 4 then return here, or (b) apply the change now (commit a diff) then re-classify, or (c) delete the finding from RETRO.md if it isn't worth either", "done": false, "mandatory": true},
+        {"action": "output GATE_PASSED or GATE_FAILED with the indices of any prose_only findings", "done": false, "mandatory": true}
+      ]
+    },
+    "4": {
+      "name": "Update Action Tracker",
+      "status": "pending",
+      "verdict": null,
+      "_note": "Sources to scan for new actions: per-PR retro 'What to Improve' items, per-PR retro 'Knowledge Base Updates Needed' items, milestone findings classified as tracker_row in stage 3.5, and any generalizable framework patterns surfaced in per-PR retros that aren't already canonicalized.",
+      "checklist": [
+        {"action": "for each per-PR 'What to Improve' item not already in the Action Tracker: add a row", "done": false, "mandatory": true},
+        {"action": "for each per-PR 'Knowledge Base Updates Needed' item not already tracked: add a row", "done": false, "mandatory": true},
+        {"action": "for each milestone finding classified as tracker_row in stage 3.5: add a row", "done": false, "mandatory": true},
+        {"action": "for each generalizable framework pattern in per-PR retros not already in CLAUDE.md / PR checklist / framework docs: add a row OR canonicalize it inline this commit (then reclassify as diff)", "done": false, "mandatory": true},
+        {"action": "for each new row: create GitHub issue with tech-debt label and record the issue number — gh issue create --title 'tech-debt: <summary>' --label tech-debt", "done": false, "mandatory": true},
+        {"action": "record new_tracker_rows and new_github_issues in state file (one entry per row with row_number, source, github_issue_number)", "done": false, "mandatory": true},
+        {"action": "for each previously-open tracker row resolved this milestone: close with PR/commit reference, record in closed_rows", "done": false, "mandatory": true},
+        {"action": "deduplicate: items appearing in multiple sources merged into one row with combined Source field", "done": false, "mandatory": true},
+        {"action": "for each RETRO_GATE_VIOLATION recorded in stage 2: backfill the missing PR retro by posting via gh pr comment <N> --body-file <retro>", "done": false, "mandatory": true},
+        {"action": "for each tracker_row finding from stage 3.5: replace the prose Action taken: line in RETRO.md with 'Open — tracked in Action Tracker #N (GitHub #NNN)' using the actual numbers", "done": false, "mandatory": true},
+        {"action": "output ACTION_TRACKER_UPDATED with counts (rows added, issues created, rows closed, retros backfilled)", "done": false, "mandatory": true}
+      ]
+    },
+    "4.5": {
+      "name": "Re-verify Action taken: lines",
+      "status": "pending",
+      "verdict": null,
+      "_note": "After stage 4 backfills tracker rows + issue numbers into the prose, re-run the stage 3.5 classification. No finding should classify as prose_only any more. If any do, stage 4 missed something.",
+      "checklist": [
+        {"action": "re-classify every finding's Action taken: line", "done": false, "mandatory": true},
+        {"action": "GATE: zero prose_only classifications — if any remain, return to stage 4", "done": false, "mandatory": true},
+        {"action": "output REVERIFY_PASSED or REVERIFY_FAILED", "done": false, "mandatory": true}
+      ]
+    },
+    "5": {
+      "name": "Update previous milestone entries",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "scan previous milestones' Open Items for items resolved in this milestone (via PR or commit reference)", "done": false},
+        {"action": "annotate resolved items with '— resolved in vX.Y.Z (PR #NN)'", "done": false},
+        {"action": "output PREVIOUS_MILESTONES_UPDATED with count of resolved items", "done": false, "mandatory": true}
+      ]
+    },
+    "6": {
+      "name": "Commit",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "git add RETRO.md (and any other files touched: CLAUDE.md if updated, PR checklist if updated, etc.)", "done": false, "mandatory": true},
+        {"action": "commit with conventional message: docs(retro): milestone vX.Y.Z + action tracker update", "done": false, "mandatory": true},
+        {"action": "post-commit verification: git log -1 --oneline (Action #122 — confirm commit hash matches expected message)", "done": false, "mandatory": true},
+        {"action": "git push origin <default-branch>", "done": false, "mandatory": true},
+        {"action": "output RETRO_COMPLETE", "done": false, "mandatory": true}
+      ]
+    }
+  }
+}
