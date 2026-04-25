@@ -166,6 +166,56 @@ stash-restore cycle — six commit attempts to land one PR. Scoping eliminates t
 
 This prevents the common pattern of 3-5 failed commit attempts due to formatting hooks.
 
+## MANDATORY Post-Commit Verification (Action #122)
+
+**After every `git commit`, run this verification:**
+
+```bash
+# Verify the commit actually registered. Pre-commit hooks that stash
+# the working tree, run a formatter, and restore can silently SWALLOW
+# the commit when the formatter touches files — `git commit` exits 0
+# but no new commit is created. Without this check, the bug is invisible
+# until you push and `git push` reports "nothing to push" — by which
+# time you've already moved on.
+LATEST=$(git log -1 --format='%H %s' 2>/dev/null)
+if ! grep -qF "<expected commit subject>" <<< "$LATEST"; then
+    echo "FAIL: commit did not register. Latest is: $LATEST"
+    echo "Re-stage and retry — pre-commit hook likely bounced."
+    git add <files-again>
+    git commit -m "<message>"
+    LATEST=$(git log -1 --format='%H %s')
+fi
+echo "OK: commit registered as $LATEST"
+```
+
+Or more concisely as a one-liner after each `git commit`:
+
+```bash
+git commit -m "..." && git log -1 --oneline
+```
+
+The `&& git log -1 --oneline` is the load-bearing detail — if the commit
+silently failed, you see `<previous-commit-subject>` and know to re-stage.
+If it registered correctly, you see `<new-commit-hash> <new-subject>`.
+
+**Why this is mandatory**: observed **8 occurrences in a single 24-hour
+session** (djust PRs #989, #996, #1007, #1008, #1014, #1015, #1021, #1024).
+Pattern: ruff or another pre-commit hook stashes the working tree, reformats
+a file, and on stash-pop creates a conflict that rolls back the commit. The
+hook output ends with `[INFO] Restored changes from /Users/tip/.cache/pre-commit/patch...`
+but no `[<branch> <hash>] <commit message>` line — that's the signal the
+commit didn't register.
+
+**Failure mode without this check**: agent moves on assuming the commit
+landed, then `git push` reports "Everything up-to-date" and the agent has to
+backtrack to figure out what happened — typically losing 5-10 minutes per
+occurrence. Across 8 occurrences in a session, that's a meaningful chunk
+of time lost to a check that takes 50 ms to run.
+
+**When to skip the check**: never. The `&& git log -1 --oneline` form has
+zero overhead on success and immediate signal on failure. Make it a reflex
+chained onto every `git commit` invocation.
+
 ## Duplicate PR Prevention
 
 Before creating a PR in the Commit & PR stage, check if one already exists:
