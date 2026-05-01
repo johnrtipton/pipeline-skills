@@ -42,6 +42,45 @@ If a project-local template exists, **always use it** — it overrides the defau
 
 When `--all`, `--all-milestones`, or `--group` is specified, the pipeline runs **fully autonomously**. Do NOT pause to ask the user if they want to continue between tasks or groups. The flag itself is the user's confirmation. Only stop on failure.
 
+## One Implementer Agent Per Checkout (the parallel-contention rule)
+
+**Do not spawn two background implementer agents concurrently against the same
+git working tree.** Concurrent implementer agents flip branches via pre-commit
+stash/restore mid-edit and produce two specific failure modes:
+
+1. **CHANGELOG cross-contamination.** Both agents edit `[Unreleased]` while
+   their branches are alternately checked out. The first agent's commit
+   captures the second agent's CHANGELOG hunks (for code that's not in the
+   first agent's diff). Stage 11 catches it as a 🔴 must-fix, but it costs
+   a follow-up cleanup commit and a CI rerun.
+2. **Duplicate `### Fixed` (or `### Added`) headings.** Each agent inserts
+   its own section above the one that was already there. Markdown still
+   parses, but Keep-a-Changelog format breaks and the Stage 9 docs commit
+   has to dedupe.
+
+**Observed cost**: v0.9.1 PR #1163 + PR #1164 (canonical example). Both lost
+~10 min wall-clock to cleanup + rebase. Verified eliminated by serializing
+iters 5-7 of the same drain.
+
+**Two acceptable mitigations**:
+
+1. **Serialize agent execution** (the proven safe path). Wait for one
+   implementer agent's PR to be opened (or at least committed) before
+   launching the next.
+2. **Single-script-transformation pattern.** Each implementer agent writes
+   a single Python or shell script that applies ALL of its filesystem edits
+   in one pass + immediately stages and commits. No incremental
+   `Edit`-tool calls between branch operations. Eliminates the partial-state
+   window during which a competing agent's branch checkout can intercept
+   the working tree. (Adopted reactively by v0.9.1 PR #1164's implementer
+   after observing the contamination on PR #1163; landed clean.)
+
+**When parallel agents ARE safe**: different git worktrees (each agent in
+its own `git worktree add` directory) or different repositories. The rule
+is one-checkout = one-agent.
+
+Canonicalized from v0.9.1 retro / Action Tracker #180 / GitHub #1172.
+
 ## Stage 1: Branch and Environment Setup
 
 The Environment Check stage needs care when local `main` is ahead of `origin/main`:
@@ -75,7 +114,9 @@ Stages with a `"_note"` field containing "SKIP if" should be evaluated:
 
 Regardless of conditions, time pressure, or the pipeline executor's own
 reasoning, these stages are **load-bearing quality gates** and cannot be
-skipped under any circumstances:
+skipped under any circumstances. (For the broader framing of why
+mandatory checklist items are the strongest enforcement venue for
+project rules, see the repo's [CANON.md](../../CANON.md).)
 
 - **Stage 11 — Code Review** — catches defects implementation misses. Observed
   case: PR #91 had Stage 11 skipped to save time; when run manually after
@@ -165,6 +206,92 @@ git commit -m "..."
 stash-restore cycle — six commit attempts to land one PR. Scoping eliminates this.
 
 This prevents the common pattern of 3-5 failed commit attempts due to formatting hooks.
+
+## MANDATORY Post-Commit Programmatic Gates (#1177 — two-commit shape + 3-clean-runs)
+
+The two-commit shape canon (Action Tracker #181 / GitHub #1173, shipped in
+PR #1176) and the 3-clean-runs verification gate (Action Tracker #182 /
+GitHub #1174, same PR) are SOFT gates — the LLM executor reads the
+imperative checklist text and self-applies. PR #1176's Stage 11 reviewer
+filed #1177 asking for HARD programmatic gates so the executor can't
+accidentally skip them.
+
+These gates fire **post-commit** (not pre-commit, so they don't fight
+with the pre-commit hook framework's stash-restore cycle). Each is a
+one-liner the executor must run after the relevant `git commit` and
+fail-loud if the gate trips.
+
+### Gate 1: Stage 5 commit must NOT include CHANGELOG.md
+
+The two-commit shape says implementation goes in commit 1, CHANGELOG +
+docs go in commit 2. Stage 5 is the implementation stage. A Stage 5
+commit that touches `CHANGELOG.md` violates the shape.
+
+```bash
+# After Stage 5 commit:
+if git show HEAD --name-only | grep -q '^CHANGELOG\.md$'; then
+    echo "FAIL: Stage 5 commit must NOT touch CHANGELOG.md (#1173 two-commit shape)."
+    echo "Reset, restage without CHANGELOG.md, recommit. Then add CHANGELOG.md to the Stage 9 commit."
+    exit 1
+fi
+```
+
+### Gate 2: Stage 9 commit must ONLY include docs + CHANGELOG
+
+Stage 9 (feature/bugfix) or Stage 5 (ship-pipeline) is the canonical
+docs commit. It must contain only docs files — anything else means
+implementation drift snuck in.
+
+```bash
+# After Stage 9 commit (feature/bugfix) / Stage 5 commit (ship):
+NON_DOCS=$(git show HEAD --name-only | grep -vE '^(CHANGELOG\.md|docs/.*|README\.md|\.pipeline-templates/.*)$' || true)
+if [ -n "$NON_DOCS" ]; then
+    echo "FAIL: Stage 9 commit contains non-docs files (#1173 two-commit shape):"
+    echo "$NON_DOCS" | sed 's/^/  /'
+    echo "Move these to a separate implementation commit BEFORE the docs commit."
+    exit 1
+fi
+```
+
+### Gate 3: 3-clean-runs verification for pollution-class fixes
+
+Bugfix Stage 6 has a checklist item: when the task description matches
+`/pollution|leak|flak|test isolation/i`, run pytest 3 times consecutively;
+all three must be clean. Replace the imperative checklist with a
+programmatic loop:
+
+```bash
+# Run inside Stage 6 (Test Execution) when task is pollution-class:
+TASK="$(jq -r .task_description .pipeline-state/<branch>.json)"
+if echo "$TASK" | grep -iqE 'pollution|leak|flak|test isolation'; then
+    for i in 1 2 3; do
+        echo "=== Pollution-class fix: pytest run $i of 3 ==="
+        if ! .venv/bin/python -m pytest tests/ python/djust/tests/ -q --no-header; then
+            echo "FAIL: run $i tripped a failure. Pollution-class fix needs 3 consecutive clean runs (#1174)."
+            exit 1
+        fi
+    done
+fi
+```
+
+### Why programmatic, not just imperative
+
+PR #1176's Stage 11 review (the one that filed #1177) noted: the soft
+gates rely on the executor reading the imperatives. An LLM executor under
+context pressure can drop the read; a fresh-session resume might miss the
+gate entirely. Programmatic enforcement makes the gate context-independent.
+
+### Where to place the gates
+
+In a project-local `scripts/pipeline-gates.sh` (one function per gate)
+called from the executor's stage-completion handler. The
+`.pipeline-templates/{feature,bugfix}-state.json` checklist items can
+keep the imperative text for human-readable signaling, but the executor
+MUST also run the programmatic gate at the corresponding stage boundary.
+
+For projects that don't have a `scripts/pipeline-gates.sh` yet, the
+executor inlines the bash one-liners above immediately after the
+relevant `git commit && git log -1 --oneline` post-commit verification.
 
 ## MANDATORY Post-Commit Verification (Action #122)
 
@@ -601,9 +728,10 @@ one concern, and explain what edge cases you checked."
 - At least one "what could be improved" item that is specific (not generic)
 - Reference to how this task's findings relate to previous tasks in the milestone
 
-**After 3+ tasks in `--all` mode**, print: "3 tasks completed. Consider
-having the user review the PRs before continuing." The user can say "continue"
-to proceed.
+In `--all` and `--all-milestones` modes, do NOT pause to ask the user
+to review PRs after N tasks. The user picked autonomous mode; respect
+that. The only valid pause is on a stage failure. The user can interrupt
+at any time if they want to review.
 
 ---
 

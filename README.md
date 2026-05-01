@@ -279,6 +279,11 @@ Drop files in your project's `.pipeline/` directory:
 
 ## Customization
 
+> Where to put new rules: see **[CANON.md](CANON.md)** for the four
+> enforcement venues (CLAUDE.md, pre-push hook, CI workflow,
+> pipeline-template) and how to choose which one a new rule belongs
+> in.
+
 ### Project Configuration
 
 The pipeline reads project config from CLAUDE.md in the project root:
