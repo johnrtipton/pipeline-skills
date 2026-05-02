@@ -38,6 +38,17 @@ grep "### Milestone:" ROADMAP.md
 Pick the last one that has at least one non-completed task, or the last one
 if all tasks are done (we're adding new ones).
 
+**Milestone-name format**: two shapes are valid (per project convention):
+
+- `vX.Y.Z` — actual release (3-digit SemVer), e.g., `v0.9.1`.
+- `vX.Y.Z-N` — drain-bucket / planning iteration, e.g., `v0.9.2-1`. Drain
+  buckets accumulate into the next release.
+
+The grep `### Milestone:` matches either shape — no parser change needed.
+When adding new buckets, prefer the pre-release form
+(`v<next-release>-<N>`) over reusing the release name as both a release
+and a planning bucket.
+
 ### 2. Fetch open GitHub issues
 
 ```bash
@@ -111,7 +122,12 @@ format (bold issue number + title, em-dash, description).
 
 ```bash
 git add ROADMAP.md
-git commit -m "docs(roadmap): add N open issues to vX.Y.Z milestone"
+git commit -m "$(cat <<'EOF'
+docs(roadmap): add N open issues to vX.Y.Z milestone
+
+Audit-bypass-reason: docs-only ROADMAP update via pipeline-drain skill (no retro needed)
+EOF
+)"
 git push origin main
 ```
 
@@ -155,6 +171,57 @@ After all issues are processed, print:
 
 If remaining open issues > 0, suggest running `/pipeline-drain` again or
 creating a new milestone.
+
+## Audit-driven drain: pre-staged work-graph recipe
+
+When a milestone starts from an audit document that catalogs weaknesses and
+files issues, the drain takes a different shape than the default
+"discover → triage → process" flow. The audit is the entry point, not the
+drain script. This recipe documents that shape.
+
+**When this shape applies**: the issues come from an audit doc
+(`docs/audits/` or `docs/<subsystem>/AUDIT-YYYY-MM-DD.md`). Sweet spot is
+3-7 issues touching the same subsystem. Below 3, audit overhead dominates;
+above 7, the drain PR becomes too big to review. Each issue should be < 1 day
+of effort. Larger issues split out.
+
+**Reference example**: v0.9.2-3 (VDOM audit #1257 → drain PR #1258).
+
+### Step A — File issues before the audit-doc PR
+
+```
+gh issue create --label tech-debt --title "tech-debt: <summary>" --body "..."
+```
+
+File all N issues BEFORE opening the audit-doc PR. The audit doc can then
+link real issue numbers (no TBD backfill). The milestone entry in ROADMAP.md
+uses live numbers from day one.
+
+### Step B — Open the milestone in the audit-doc PR
+
+Single docs-only PR that adds:
+- `docs/<subsystem>/AUDIT-YYYY-MM-DD.md` (the audit document)
+- ROADMAP.md milestone entry (linked to the pre-filed issues)
+- CHANGELOG.md note (audit added, not a user-facing change)
+
+### Step C — Drain via grouped PR
+
+```
+/pipeline-drain --milestone vX.Y.Z-N --group --all
+```
+
+The drain script picks up the pre-staged issues from ROADMAP.md and groups
+them into a single implementation PR. This is faster than N separate small PRs
+because:
+- Issues are pre-staged and contextualized in the audit doc.
+- Stage 4 VERIFY LITERAL API CONTRACTS catches audit drift on first-use.
+- Stage 7 / Stage 8 reviews can spot-check audit claims rather than
+  re-deriving from scratch.
+
+### Step D — Single retro covers both PRs
+
+Run `/pipeline-retro --milestone vX.Y.Z-N`. The audit PR + drain PR are one
+coherent unit; the retro synthesizes across both.
 
 ## Integration
 
