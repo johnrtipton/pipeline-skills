@@ -1,8 +1,8 @@
 # Pipeline Skill
 
-A development pipeline harness for Claude Code. Runs multi-stage pipelines (feature, bugfix, refactor) with enforced quality gates, PR reviews, and retrospectives. Ships as both:
+A development pipeline harness for Claude Code. Runs multi-stage pipelines (feature, bugfix, refactor, strategy) with enforced quality gates, PR reviews, and retrospectives. Ships as both:
 
-- **8 interactive skills** (`/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, etc.) for use from a Claude Code chat — this is the primary interface
+- **9 interactive skills** (`/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-strategy`, etc.) for use from a Claude Code chat — this is the primary interface
 - **`pipeline.py` harness** for autonomous / headless runs against a project
 
 ## The Problem
@@ -25,6 +25,7 @@ Each skill is a single `SKILL.md` invoked by typing `/<skill-name>` in Claude Co
 | [`/pipeline-dev`](skills/pipeline-dev/SKILL.md) | Fast-iteration loop for early development: branch → implement → push → verify → merge. No subagent review, no CHANGELOG, no roadmap coupling | Early exploration, where **you** are the reviewer (manual browser/CLI verification) |
 | [`/pipeline-retro`](skills/pipeline-retro/SKILL.md) | Milestone retrospectives + Action Tracker reconciliation. Synthesizes per-PR retros into `RETRO.md`, creates GitHub issues for deferred findings. `--reconcile` scans all tracking locations for drift | End of every milestone |
 | [`/pipeline-roadmap-audit`](skills/pipeline-roadmap-audit/SKILL.md) | Verifies every "not started" ROADMAP entry against the actual codebase. Catches stale entries where a feature shipped but the ROADMAP still claims it's pending | Before cutting a release candidate; after large consolidations |
+| [`/pipeline-strategy`](skills/pipeline-strategy/SKILL.md) | Planning-side analog of `/pipeline-run`. Surveys project state, brainstorms candidates from pluggable sources, triages, clusters, presents ≥2 distinct paths, recommends, captures the chosen path back into ROADMAP / ADRs / next-step | At milestone boundaries; auto-fired (light mode) after every `/pipeline-retro` |
 | [`/pipeline-drain`](skills/pipeline-drain/SKILL.md) | Drains open GitHub issues (optionally by label) into the current milestone, then runs `/pipeline-run --milestone --all` to process them all | Tech-debt sprint day; processing a backlog of retro-created issues |
 | [`/pipeline-shared`](skills/pipeline-shared/SKILL.md) | Shared stage procedures (env check, testing, security, docs, PR, review, merge, retro) referenced by the other pipeline skills. **Not invoked directly** | Internal — referenced by name from the other skills |
 
@@ -48,6 +49,8 @@ END OF MILESTONE:
   /pipeline-retro --milestone v0.4.0         # synthesize per-PR retros
   /pipeline-retro --actions                  # show open action-tracker items
   /pipeline-retro --reconcile                # create GitHub issues for deferred findings
+  /pipeline-strategy --light                  # auto-fired after retro: anything to escalate?
+  /pipeline-strategy --slug v0-4-end          # full deep planning session if escalated
 
 HYGIENE:
   /pipeline-roadmap-audit --milestone v0.5.0 # verify ROADMAP matches reality
@@ -112,6 +115,19 @@ Env Check → Conflict Check → Analysis → Refactor Execution → Test → Re
 → Documentation → Commit & PR → Code Review → Review Verdict → Merge
 → Retrospective
 ```
+
+### Strategy (8 stages, no commit)
+
+```
+Survey → Brainstorm → Triage → Cluster → Present-Paths (≥2) → Recommend
+→ Decide → Capture (ROADMAP + ADR + kick off /pipeline-next)
+```
+
+The planning analog of the execution pipelines above. Same state-file
+discipline, but the "code" being produced is a chosen path forward — the
+written-down alternatives that were considered, the recommendation, and
+the user's decision. Stage 8 hands off to `/pipeline-next` so execution
+takes over with a truthful ROADMAP.
 
 ## How It Works
 
@@ -225,7 +241,8 @@ pipeline-skill/
 │   ├── feature-state.json              # Feature pipeline template (15 stages)
 │   ├── bugfix-state.json               # Bug fix pipeline template (12 stages)
 │   ├── refactor-state.json             # Refactor pipeline template (12 stages)
-│   └── ship-state.json                 # Ship pipeline template (10 stages)
+│   ├── ship-state.json                 # Ship pipeline template (10 stages)
+│   └── strategy-state.json             # Strategy session template (8 stages)
 └── skills/
     ├── pipeline-next/SKILL.md          # Task picker from ROADMAP.md
     ├── pipeline-run/SKILL.md           # Stage executor
@@ -233,6 +250,7 @@ pipeline-skill/
     ├── pipeline-dev/SKILL.md           # Fast-iteration loop (no subagent review)
     ├── pipeline-retro/SKILL.md         # Milestone retros + action tracker
     ├── pipeline-roadmap-audit/SKILL.md # Catch stale ROADMAP entries
+    ├── pipeline-strategy/SKILL.md      # Plan the next milestone (≥2 paths, recommend, capture)
     ├── pipeline-drain/SKILL.md         # Batch-process open GitHub issues
     └── pipeline-shared/SKILL.md        # Shared procedures (referenced, not invoked)
 ```
