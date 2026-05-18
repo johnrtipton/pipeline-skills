@@ -43,6 +43,10 @@ the actions the prose calls for.
 truth for all retrospective actions. Every "What to Improve" recommendation
 and every deferred code-review finding must appear here.
 
+**Status values**: `Open` (actionable in this repo), `Closed` (resolved with reason),
+`OUT-OF-REPO` (blocked on work in a different repository; Notes must point at
+upstream repo + issue).
+
 ```markdown
 ## Action Tracker
 
@@ -55,12 +59,14 @@ issue or be explicitly closed with a reason.
 | 2 | Template sandboxing | PR #50 | #52 | Open | |
 | 3 | Audit existing mutation handlers | Retro v0.4.0 | — | Open | One-time task |
 | 4 | HMAC-based SSN lookup | Retro v0.3.0 | — | Closed | No current need |
+| 5 | Something cross-repo | Retro v0.5.0 | — | OUT-OF-REPO | Awaiting pipeline-skill#NN |
 ```
 
 **Rules**:
 - Every row must have a Source (PR number or milestone retro)
-- Every open row should have a GitHub issue number (create one if missing)
+- Every Open row should have a GitHub issue number (create one if missing)
 - Close items with a reason, don't delete them
+- OUT-OF-REPO rows must document the upstream repo + issue in the Notes column
 - Deduplicate: if the same item appears in multiple retros, keep one row with all sources
 
 ## How the state file drives the retro
@@ -86,6 +92,12 @@ pipeline halts — fix the issue and resume.
 If `--milestone` is given, use it. Otherwise read `RETRO.md` to find the
 latest entry, then look for the next milestone with completed work but no
 retro entry.
+
+**Milestone-name format**: accepts both `vX.Y.Z` (actual release) and
+`vX.Y.Z-N` (drain bucket / planning iteration toward release `vX.Y.Z`).
+The state-file naming `retro-<milestone>.json` works for either shape;
+just substitute the `.` for `-` if you prefer (e.g.,
+`retro-v0.9.2-1.json` is fine).
 
 ```bash
 # completed pipeline state files
@@ -333,6 +345,9 @@ Scan all tracking locations and reconcile:
    - Items in Action Tracker without GitHub issues → create issues
    - Duplicate items → merge into single tracker row with multiple sources
    - PRs with no retro at all → flag as gate violations, surface for backfill
+   - OUT-OF-REPO rows → verify the Notes column points at the upstream repo
+     + issue number; if the cross-repo work is done, advance to Closed;
+     if the Notes field is missing the upstream reference, flag it
 6. **Re-run Stage 3.5 classification** against every existing milestone
    entry. Any `prose_only` lines from earlier milestones get backfilled with
    tracker rows + issue numbers.
@@ -341,15 +356,22 @@ Scan all tracking locations and reconcile:
 ## Actions Mode (`--actions`)
 
 Print the Action Tracker table from RETRO.md, filtered by status:
-- `--actions` → open items only
-- `--actions --all` → all items (open + closed)
+- `--actions` → open items only (Open + OUT-OF-REPO, counted separately)
+- `--actions --all` → all items (Open + OUT-OF-REPO + Closed)
 
-For each open item, check if the GitHub issue is still open:
+For each Open item, check if the GitHub issue is still open:
 ```bash
 gh issue view <number> --json state -q '.state'
 ```
 
 Flag any inconsistencies (tracker says Open but issue is Closed, or vice versa).
+
+OUT-OF-REPO items are displayed in their own group under the open-items
+output, labeled "Cross-repo (blocked on external work)". Their GitHub
+issues (if any) are not checked for open/closed status since the blocking
+work is in a different repository. The count line reports
+"N open, M out-of-repo, T total" to avoid polluting the actionable-open
+count with cross-repo-blocked items.
 
 ## Integration with pipeline-run
 

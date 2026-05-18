@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A development pipeline harness for Claude Code. `pipeline.py` is an external script that drives Claude Code through multi-stage quality pipelines (feature, bugfix, refactor, ship) by controlling stage flow via state files. Claude handles the work within each stage; the script ensures every stage runs — solving the problem of context compression losing later-stage instructions.
+A development pipeline harness for Claude Code. `pipeline.py` is an external script that drives Claude Code through multi-stage quality pipelines (feature, bugfix, refactor, ship, strategy) by controlling stage flow via state files. Claude handles the work within each stage; the script ensures every stage runs — solving the problem of context compression losing later-stage instructions.
+
+The same state-file-as-program pattern covers both **execution** (feature/bugfix/refactor/ship — make the change, ship it) and **planning** (strategy — decide what change to make next). The strategy pipeline is structurally identical: 8 stages with mandatory checklists, gated by a hard rule that ≥2 distinct paths must be presented before a recommendation is captured. See `skills/pipeline-strategy/SKILL.md`.
 
 ## Architecture
 
@@ -23,11 +25,12 @@ extracts verdict from output → updates state file → repeats for next stage
 **Key components:**
 - `pipeline.py` — The harness: state management, verdict extraction, stage loop, ROADMAP parser, auto mode, profile system
 - `profiles/*.json` — Framework-specific customization (security patterns, checklist items, auto-reject triggers)
-- `templates/*.json` — State file templates defining all stages, checklists, verdicts, and subagent prompts per pipeline type
+- `templates/*.json` — State file templates defining all stages, checklists, verdicts, and subagent prompts per pipeline type. Mandatory checklist items here are the strongest form of project canon (see [CANON.md](CANON.md) for how this venue compares to CLAUDE.md / pre-push / CI).
 - `skills/pipeline-shared/SKILL.md` — Shared stage procedures (environment check, testing, security, review, merge, retro)
 - `skills/pipeline-next/SKILL.md` — Task picker: parses ROADMAP.md, filters by milestone/priority, groups related tasks
 - `skills/pipeline-run/SKILL.md` — Stage executor: reads state file, spawns agents per stage, updates state
 - `skills/pipeline-ship/SKILL.md` — Ships existing working tree changes through quality gates to merged PR
+- `skills/pipeline-strategy/SKILL.md` — Plans the next milestone via state-file-driven 8-stage session: survey → brainstorm → triage → cluster → present-paths (≥2) → recommend → decide → capture (ROADMAP/ADR/next-step)
 
 **State files** live in the target project at `.pipeline-state/<branch>.json` (gitignored). They track per-stage status, checklists with mandatory flags, verdicts, PR info, and enable resume after interruption.
 

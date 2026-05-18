@@ -42,6 +42,61 @@ If a project-local template exists, **always use it** — it overrides the defau
 
 When `--all`, `--all-milestones`, or `--group` is specified, the pipeline runs **fully autonomously**. Do NOT pause to ask the user if they want to continue between tasks or groups. The flag itself is the user's confirmation. Only stop on failure.
 
+## Stage identity — names, not numbers
+
+A stage is identified by its **`name`**, never its number. Stage
+*numbers* are an artifact of a given project's template — one project's
+14-stage template puts Re-Review at 13, a 16-stage template puts it at
+15. Any rule in this skill that names a stage ("never skip Code
+Review", "the Documentation-stage commit") refers to the stage with
+that `name` field in the state file, whatever number it happens to
+carry.
+
+When a rule below cites a number (e.g. "Stage 5 / Implementation"),
+the number is an illustration from the default template and the
+**name** is authoritative. To act on a stage, match `stages[*].name` —
+never assume a number. This keeps the skill correct across projects
+with different stage counts.
+
+## One Implementer Agent Per Checkout (the parallel-contention rule)
+
+**Do not spawn two background implementer agents concurrently against the same
+git working tree.** Concurrent implementer agents flip branches via pre-commit
+stash/restore mid-edit and produce two specific failure modes:
+
+1. **CHANGELOG cross-contamination.** Both agents edit `[Unreleased]` while
+   their branches are alternately checked out. The first agent's commit
+   captures the second agent's CHANGELOG hunks (for code that's not in the
+   first agent's diff). Stage 11 catches it as a 🔴 must-fix, but it costs
+   a follow-up cleanup commit and a CI rerun.
+2. **Duplicate `### Fixed` (or `### Added`) headings.** Each agent inserts
+   its own section above the one that was already there. Markdown still
+   parses, but Keep-a-Changelog format breaks and the Stage 9 docs commit
+   has to dedupe.
+
+**Observed cost**: v0.9.1 PR #1163 + PR #1164 (canonical example). Both lost
+~10 min wall-clock to cleanup + rebase. Verified eliminated by serializing
+iters 5-7 of the same drain.
+
+**Two acceptable mitigations**:
+
+1. **Serialize agent execution** (the proven safe path). Wait for one
+   implementer agent's PR to be opened (or at least committed) before
+   launching the next.
+2. **Single-script-transformation pattern.** Each implementer agent writes
+   a single Python or shell script that applies ALL of its filesystem edits
+   in one pass + immediately stages and commits. No incremental
+   `Edit`-tool calls between branch operations. Eliminates the partial-state
+   window during which a competing agent's branch checkout can intercept
+   the working tree. (Adopted reactively by v0.9.1 PR #1164's implementer
+   after observing the contamination on PR #1163; landed clean.)
+
+**When parallel agents ARE safe**: different git worktrees (each agent in
+its own `git worktree add` directory) or different repositories. The rule
+is one-checkout = one-agent.
+
+Canonicalized from v0.9.1 retro / Action Tracker #180 / GitHub #1172.
+
 ## Stage 1: Branch and Environment Setup
 
 The Environment Check stage needs care when local `main` is ahead of `origin/main`:
@@ -65,6 +120,28 @@ If multiple parallel stages fail (e.g., both Self-Review and Security Check find
 3. After fixes, mark all failed parallel stages as `passed` (with `_AFTER_FIXES` suffix on verdict)
 4. Do NOT re-run each failed stage individually — that wastes time. The Code Review stage (Stage 11) will catch anything the fix missed.
 
+### Inline-verify shortcut for low-risk changes
+
+The Test Execution / Self-Review / Security Check stages normally fan
+out to 3 parallel subagents (see above). For a low-risk change the
+subagent spin-up is pure overhead — the executor may run these three
+stages **inline** (in its own context) instead, when ALL of the
+following hold:
+
+- Implementation diff is under ~200 lines
+- No new public API surface (no new exported symbol, attribute, flag,
+  or wire-protocol field)
+- No security-class change (nothing the project's security profile
+  flags — auth, escaping, deserialization, file I/O, subprocess)
+- Existing tests already cover the changed code paths
+
+Inline-verify still performs every check a subagent would — it only
+skips the fresh-context spawn, and the verdict is still recorded in the
+state file. If any condition is uncertain, fan out. These stages stay
+non-skippable; the shortcut changes *how* they run, not *whether*.
+Empirical: ~10 min wall-clock saved per low-risk task with no loss of
+review depth.
+
 ## Conditional Stages
 
 Stages with a `"_note"` field containing "SKIP if" should be evaluated:
@@ -75,22 +152,27 @@ Stages with a `"_note"` field containing "SKIP if" should be evaluated:
 
 Regardless of conditions, time pressure, or the pipeline executor's own
 reasoning, these stages are **load-bearing quality gates** and cannot be
-skipped under any circumstances:
+skipped under any circumstances. (For the broader framing of why
+mandatory checklist items are the strongest enforcement venue for
+project rules, see the repo's [CANON.md](../../CANON.md).)
 
-- **Stage 11 — Code Review** — catches defects implementation misses. Observed
-  case: PR #91 had Stage 11 skipped to save time; when run manually after
+- **Code Review** — catches defects implementation misses. Observed
+  case: PR #91 had Code Review skipped to save time; when run manually after
   the fact it found a race condition (`select_for_update` missing), unhandled
   DocuSign exceptions, and zero test coverage for a new mutation handler.
-- **Stage 13 — Re-Review** — verifies that findings from Stage 11 were
+- **Re-Review** — verifies that findings from Code Review were
   actually addressed, not just claimed addressed. May be marked `skipped`
-  ONLY when Stage 11 produced zero 🔴 and zero 🟡 findings (the `skip_if`
+  ONLY when Code Review produced zero 🔴 and zero 🟡 findings (the `skip_if`
   condition in the template). Never skipped "to save time" when findings exist.
-- **Stage 15 — Retrospective** — milestone learning lives here. Skipping it
+- **Retrospective** — milestone learning lives here. Skipping it
   is how lessons get lost between milestones.
 
-If the executor finds itself reasoning "I'll skip Stage 11/13/15 because the
-change is small / I already reviewed it / we're in a hurry" — STOP. That
-reasoning is the failure mode. Run the stage.
+(These are typically Stages 11 / 13 / 15 in the default template, but
+match them by `name` per "Stage identity — names, not numbers" above.)
+
+If the executor finds itself reasoning "I'll skip Code Review / Re-Review /
+Retrospective because the change is small / I already reviewed it / we're
+in a hurry" — STOP. That reasoning is the failure mode. Run the stage.
 
 ## Gate Check (Integrity Audit)
 
@@ -135,6 +217,27 @@ Before running `git commit` in the Implementation or Commit & PR stage, always r
 the project's linters and formatters **against the exact staged files**, not the
 whole tree:
 
+### Branch-verify reflex (before any pipeline commit)
+
+Before staging, confirm HEAD is the branch the active state file
+names. A commit landing on the wrong branch is silent — it pushes, the
+PR ends up with the wrong changes, and recovery needs a cherry-pick +
+force-push.
+
+```bash
+HEAD=$(git symbolic-ref --short HEAD)
+STATE=$(grep -l "\"branch_name\": \"$HEAD\"" .pipeline-state/*.json 2>/dev/null | head -1)
+if [ -z "$STATE" ]; then
+    echo "ERROR: HEAD ($HEAD) has no matching state file — wrong branch, or run /pipeline-next first."
+    exit 1
+fi
+echo "OK: HEAD=$HEAD matches $STATE"
+```
+
+The check is <50 ms — run it as a reflex before every pipeline commit.
+This is the per-commit companion to the one-time **State-File Gate**
+below (which fires at branch creation / first commit / PR open).
+
 ```bash
 # 1. Stage the files you intend to commit FIRST.
 git add <file1> <file2> ...
@@ -165,6 +268,92 @@ git commit -m "..."
 stash-restore cycle — six commit attempts to land one PR. Scoping eliminates this.
 
 This prevents the common pattern of 3-5 failed commit attempts due to formatting hooks.
+
+## MANDATORY Post-Commit Programmatic Gates (#1177 — two-commit shape + 3-clean-runs)
+
+The two-commit shape canon (Action Tracker #181 / GitHub #1173, shipped in
+PR #1176) and the 3-clean-runs verification gate (Action Tracker #182 /
+GitHub #1174, same PR) are SOFT gates — the LLM executor reads the
+imperative checklist text and self-applies. PR #1176's Stage 11 reviewer
+filed #1177 asking for HARD programmatic gates so the executor can't
+accidentally skip them.
+
+These gates fire **post-commit** (not pre-commit, so they don't fight
+with the pre-commit hook framework's stash-restore cycle). Each is a
+one-liner the executor must run after the relevant `git commit` and
+fail-loud if the gate trips.
+
+### Gate 1: Stage 5 commit must NOT include CHANGELOG.md
+
+The two-commit shape says implementation goes in commit 1, CHANGELOG +
+docs go in commit 2. Stage 5 is the implementation stage. A Stage 5
+commit that touches `CHANGELOG.md` violates the shape.
+
+```bash
+# After Stage 5 commit:
+if git show HEAD --name-only | grep -q '^CHANGELOG\.md$'; then
+    echo "FAIL: Stage 5 commit must NOT touch CHANGELOG.md (#1173 two-commit shape)."
+    echo "Reset, restage without CHANGELOG.md, recommit. Then add CHANGELOG.md to the Stage 9 commit."
+    exit 1
+fi
+```
+
+### Gate 2: Stage 9 commit must ONLY include docs + CHANGELOG
+
+Stage 9 (feature/bugfix) or Stage 5 (ship-pipeline) is the canonical
+docs commit. It must contain only docs files — anything else means
+implementation drift snuck in.
+
+```bash
+# After Stage 9 commit (feature/bugfix) / Stage 5 commit (ship):
+NON_DOCS=$(git show HEAD --name-only | grep -vE '^(CHANGELOG\.md|docs/.*|README\.md|\.pipeline-templates/.*)$' || true)
+if [ -n "$NON_DOCS" ]; then
+    echo "FAIL: Stage 9 commit contains non-docs files (#1173 two-commit shape):"
+    echo "$NON_DOCS" | sed 's/^/  /'
+    echo "Move these to a separate implementation commit BEFORE the docs commit."
+    exit 1
+fi
+```
+
+### Gate 3: 3-clean-runs verification for pollution-class fixes
+
+Bugfix Stage 6 has a checklist item: when the task description matches
+`/pollution|leak|flak|test isolation/i`, run pytest 3 times consecutively;
+all three must be clean. Replace the imperative checklist with a
+programmatic loop:
+
+```bash
+# Run inside Stage 6 (Test Execution) when task is pollution-class:
+TASK="$(jq -r .task_description .pipeline-state/<branch>.json)"
+if echo "$TASK" | grep -iqE 'pollution|leak|flak|test isolation'; then
+    for i in 1 2 3; do
+        echo "=== Pollution-class fix: pytest run $i of 3 ==="
+        if ! .venv/bin/python -m pytest tests/ python/djust/tests/ -q --no-header; then
+            echo "FAIL: run $i tripped a failure. Pollution-class fix needs 3 consecutive clean runs (#1174)."
+            exit 1
+        fi
+    done
+fi
+```
+
+### Why programmatic, not just imperative
+
+PR #1176's Stage 11 review (the one that filed #1177) noted: the soft
+gates rely on the executor reading the imperatives. An LLM executor under
+context pressure can drop the read; a fresh-session resume might miss the
+gate entirely. Programmatic enforcement makes the gate context-independent.
+
+### Where to place the gates
+
+In a project-local `scripts/pipeline-gates.sh` (one function per gate)
+called from the executor's stage-completion handler. The
+`.pipeline-templates/{feature,bugfix}-state.json` checklist items can
+keep the imperative text for human-readable signaling, but the executor
+MUST also run the programmatic gate at the corresponding stage boundary.
+
+For projects that don't have a `scripts/pipeline-gates.sh` yet, the
+executor inlines the bash one-liners above immediately after the
+relevant `git commit && git log -1 --oneline` post-commit verification.
 
 ## MANDATORY Post-Commit Verification (Action #122)
 
@@ -197,6 +386,36 @@ git commit -m "..." && git log -1 --oneline
 The `&& git log -1 --oneline` is the load-bearing detail — if the commit
 silently failed, you see `<previous-commit-subject>` and know to re-stage.
 If it registered correctly, you see `<new-commit-hash> <new-subject>`.
+
+### The `git commit --amend` companion
+
+The `&& git log -1 --oneline` reflex detects a swallowed
+*create-a-new-commit* — a bounced commit leaves the PREVIOUS subject
+visible, which is the signal. It does **not** detect a bounced
+`git commit --amend`: after a bounced amend the OLD commit is still
+HEAD with its OLD subject, so a subject *is* shown and the reflex
+passes green on a failure.
+
+For `--amend` specifically, capture the pre-amend hash and assert it
+changed — amend always rehashes, so an unchanged HEAD is definitionally
+a bounce:
+
+```bash
+PRE=$(git rev-parse HEAD)
+git commit --amend -m "..."
+POST=$(git rev-parse HEAD)
+if [ "$PRE" = "$POST" ]; then
+    echo "FAIL: --amend bounced (HEAD unchanged). Re-stage and retry."
+    exit 1
+fi
+echo "OK: amend registered — $PRE -> $POST"
+```
+
+Also: any agent reporting a commit hash must obtain it from a live
+`git rev-parse HEAD` *after* the commit operation — never quote a hash
+printed earlier or planned. Observed failure: a fixer agent reported
+"amended commit <hash>" quoting the stale pre-amend hash after a
+bounced amend; the bounce was caught only on first principles.
 
 **Why this is mandatory**: observed **8 occurrences in a single 24-hour
 session** (djust PRs #989, #996, #1007, #1008, #1014, #1015, #1021, #1024).
@@ -601,9 +820,10 @@ one concern, and explain what edge cases you checked."
 - At least one "what could be improved" item that is specific (not generic)
 - Reference to how this task's findings relate to previous tasks in the milestone
 
-**After 3+ tasks in `--all` mode**, print: "3 tasks completed. Consider
-having the user review the PRs before continuing." The user can say "continue"
-to proceed.
+In `--all` and `--all-milestones` modes, do NOT pause to ask the user
+to review PRs after N tasks. The user picked autonomous mode; respect
+that. The only valid pause is on a stage failure. The user can interrupt
+at any time if they want to review.
 
 ---
 

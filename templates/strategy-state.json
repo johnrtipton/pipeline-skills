@@ -1,0 +1,144 @@
+{
+  "pipeline_type": "strategy",
+  "task_description": "",
+  "branch_name": "",
+  "pr_target_branch": "main",
+  "project_path": "",
+  "started_at": "",
+  "completed_at": null,
+  "current_stage": 1,
+  "trigger": "milestone-boundary",
+  "mode": "deep",
+  "context_summary": "",
+  "stages": {
+    "1": {
+      "name": "Survey",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "read ROADMAP.md priority matrix and current/next milestones", "done": false, "mandatory": true},
+        {"action": "read most recent 3 retro entries (retros.md or RETRO.md or .pipeline-log.md)", "done": false, "mandatory": true},
+        {"action": "read project insights.md — note candidate-near-threshold entries (count >= 2)", "done": false},
+        {"action": "read decisions.md / docs/adr/ — list active commitments", "done": false},
+        {"action": "list active ADR files that constrain near-term decisions", "done": false},
+        {"action": "check for failing test suite, doctor checks, or bench regressions (project-specific commands)", "done": false},
+        {"action": "scan open GitHub issues — note any stale-PR or blocking signals", "done": false},
+        {"action": "read user-feedback memory entries — note active scope/style constraints", "done": false},
+        {"action": "write one-paragraph survey summary to state file output.summary", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "summary": null
+      }
+    },
+    "2": {
+      "name": "Brainstorm",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "for each enabled brainstorm source, collect candidates (see SKILL.md § brainstorm sources)", "done": false, "mandatory": true},
+        {"action": "confirm >= 6 total candidates before advancing (a brainstorm with fewer is a survey miss)", "done": false, "mandatory": true},
+        {"action": "each candidate has: title, source, one-line description, est. effort", "done": false, "mandatory": true},
+        {"action": "write candidates list to state file output.candidates", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "candidates": []
+      }
+    },
+    "3": {
+      "name": "Triage",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "score each candidate against project user-visible-value tests if defined (e.g., master_control ADR-0001's three tests)", "done": false},
+        {"action": "score each candidate against estimated effort and dependencies", "done": false},
+        {"action": "tag each candidate: pass | borderline | fails-uvv | cleanup | pre-req", "done": false, "mandatory": true},
+        {"action": "note pre-existing ADR commitments that constrain triage", "done": false},
+        {"action": "write triaged list to state file output.triaged", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "triaged": []
+      }
+    },
+    "4": {
+      "name": "Cluster",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "group related candidates into 2-5 clusters (themes / coherent milestones)", "done": false, "mandatory": true},
+        {"action": "each cluster has: theme, included candidates, total effort, signal/effort score", "done": false, "mandatory": true},
+        {"action": "write clusters to state file output.clusters", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "clusters": []
+      }
+    },
+    "5": {
+      "name": "Present-Paths",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "construct >= 2 distinct paths from clusters", "done": false, "mandatory": true},
+        {"action": "confirm paths differ in EITHER ordered milestones, scope, or risk profile (not just slow/fast variants of the same plan)", "done": false, "mandatory": true},
+        {"action": "each path has: name, included clusters, total effort, signal/effort, risks, dependencies", "done": false, "mandatory": true},
+        {"action": "if only one path is genuinely viable: record short_circuit_reason in state file and proceed", "done": false},
+        {"action": "write paths to state file output.paths", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "paths": [],
+        "short_circuit_reason": null
+      }
+    },
+    "6": {
+      "name": "Recommend",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "pick one path as the recommended default", "done": false, "mandatory": true},
+        {"action": "write reasoning to output.reasoning (>= 3 sentences, naming which active ADRs / constraints support or oppose it)", "done": false, "mandatory": true},
+        {"action": "list active ADR commitments that support / oppose the recommendation", "done": false},
+        {"action": "output RECOMMEND_READY", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "recommended": null,
+        "reasoning": null
+      }
+    },
+    "7": {
+      "name": "Decide",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "user confirms recommendation OR picks alternative path (in light mode, model may default-confirm if recommendation is unambiguous)", "done": false, "mandatory": true},
+        {"action": "if chosen != recommended: capture user's reasoning briefly in output.user_reasoning_if_override", "done": false},
+        {"action": "detect directional change (chosen path overrides an active ADR commitment) — set output.directional_change = true and flag for ADR draft", "done": false, "mandatory": true},
+        {"action": "output DECIDE_DONE", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "chosen_path": null,
+        "user_reasoning_if_override": null,
+        "directional_change": false
+      }
+    },
+    "8": {
+      "name": "Capture",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {"action": "update ROADMAP.md priority matrix with chosen path's milestones (add rows or update existing)", "done": false, "mandatory": true},
+        {"action": "if directional_change: draft new ADR file under docs/adr/ — title, status=Proposed, context, decision, consequences", "done": false, "mandatory": true},
+        {"action": "append to retros.md (or equivalent): forward-link from most recent arc retro to this strategy session", "done": false},
+        {"action": "render markdown summary to docs/strategy-sessions/YYYY-MM-DD-<slug>.md (alternatives + recommendation + decision)", "done": false, "mandatory": true},
+        {"action": "kick off /pipeline-next for the first execution task in the chosen path", "done": false, "mandatory": true},
+        {"action": "output CAPTURE_DONE", "done": false, "mandatory": true}
+      ],
+      "output": {
+        "roadmap_updated": false,
+        "adr_drafted": null,
+        "retro_link_added": false,
+        "session_md_written": null,
+        "next_pipeline_kicked_off": null
+      }
+    }
+  },
+  "rewind_count": 0
+}
