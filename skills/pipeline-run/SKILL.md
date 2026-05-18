@@ -42,6 +42,22 @@ If a project-local template exists, **always use it** — it overrides the defau
 
 When `--all`, `--all-milestones`, or `--group` is specified, the pipeline runs **fully autonomously**. Do NOT pause to ask the user if they want to continue between tasks or groups. The flag itself is the user's confirmation. Only stop on failure.
 
+## Stage identity — names, not numbers
+
+A stage is identified by its **`name`**, never its number. Stage
+*numbers* are an artifact of a given project's template — one project's
+14-stage template puts Re-Review at 13, a 16-stage template puts it at
+15. Any rule in this skill that names a stage ("never skip Code
+Review", "the Documentation-stage commit") refers to the stage with
+that `name` field in the state file, whatever number it happens to
+carry.
+
+When a rule below cites a number (e.g. "Stage 5 / Implementation"),
+the number is an illustration from the default template and the
+**name** is authoritative. To act on a stage, match `stages[*].name` —
+never assume a number. This keeps the skill correct across projects
+with different stage counts.
+
 ## One Implementer Agent Per Checkout (the parallel-contention rule)
 
 **Do not spawn two background implementer agents concurrently against the same
@@ -104,6 +120,28 @@ If multiple parallel stages fail (e.g., both Self-Review and Security Check find
 3. After fixes, mark all failed parallel stages as `passed` (with `_AFTER_FIXES` suffix on verdict)
 4. Do NOT re-run each failed stage individually — that wastes time. The Code Review stage (Stage 11) will catch anything the fix missed.
 
+### Inline-verify shortcut for low-risk changes
+
+The Test Execution / Self-Review / Security Check stages normally fan
+out to 3 parallel subagents (see above). For a low-risk change the
+subagent spin-up is pure overhead — the executor may run these three
+stages **inline** (in its own context) instead, when ALL of the
+following hold:
+
+- Implementation diff is under ~200 lines
+- No new public API surface (no new exported symbol, attribute, flag,
+  or wire-protocol field)
+- No security-class change (nothing the project's security profile
+  flags — auth, escaping, deserialization, file I/O, subprocess)
+- Existing tests already cover the changed code paths
+
+Inline-verify still performs every check a subagent would — it only
+skips the fresh-context spawn, and the verdict is still recorded in the
+state file. If any condition is uncertain, fan out. These stages stay
+non-skippable; the shortcut changes *how* they run, not *whether*.
+Empirical: ~10 min wall-clock saved per low-risk task with no loss of
+review depth.
+
 ## Conditional Stages
 
 Stages with a `"_note"` field containing "SKIP if" should be evaluated:
@@ -118,20 +156,23 @@ skipped under any circumstances. (For the broader framing of why
 mandatory checklist items are the strongest enforcement venue for
 project rules, see the repo's [CANON.md](../../CANON.md).)
 
-- **Stage 11 — Code Review** — catches defects implementation misses. Observed
-  case: PR #91 had Stage 11 skipped to save time; when run manually after
+- **Code Review** — catches defects implementation misses. Observed
+  case: PR #91 had Code Review skipped to save time; when run manually after
   the fact it found a race condition (`select_for_update` missing), unhandled
   DocuSign exceptions, and zero test coverage for a new mutation handler.
-- **Stage 13 — Re-Review** — verifies that findings from Stage 11 were
+- **Re-Review** — verifies that findings from Code Review were
   actually addressed, not just claimed addressed. May be marked `skipped`
-  ONLY when Stage 11 produced zero 🔴 and zero 🟡 findings (the `skip_if`
+  ONLY when Code Review produced zero 🔴 and zero 🟡 findings (the `skip_if`
   condition in the template). Never skipped "to save time" when findings exist.
-- **Stage 15 — Retrospective** — milestone learning lives here. Skipping it
+- **Retrospective** — milestone learning lives here. Skipping it
   is how lessons get lost between milestones.
 
-If the executor finds itself reasoning "I'll skip Stage 11/13/15 because the
-change is small / I already reviewed it / we're in a hurry" — STOP. That
-reasoning is the failure mode. Run the stage.
+(These are typically Stages 11 / 13 / 15 in the default template, but
+match them by `name` per "Stage identity — names, not numbers" above.)
+
+If the executor finds itself reasoning "I'll skip Code Review / Re-Review /
+Retrospective because the change is small / I already reviewed it / we're
+in a hurry" — STOP. That reasoning is the failure mode. Run the stage.
 
 ## Gate Check (Integrity Audit)
 
@@ -175,6 +216,27 @@ change (already fixed, by-design, config issue), the pipeline supports a short-c
 Before running `git commit` in the Implementation or Commit & PR stage, always run
 the project's linters and formatters **against the exact staged files**, not the
 whole tree:
+
+### Branch-verify reflex (before any pipeline commit)
+
+Before staging, confirm HEAD is the branch the active state file
+names. A commit landing on the wrong branch is silent — it pushes, the
+PR ends up with the wrong changes, and recovery needs a cherry-pick +
+force-push.
+
+```bash
+HEAD=$(git symbolic-ref --short HEAD)
+STATE=$(grep -l "\"branch_name\": \"$HEAD\"" .pipeline-state/*.json 2>/dev/null | head -1)
+if [ -z "$STATE" ]; then
+    echo "ERROR: HEAD ($HEAD) has no matching state file — wrong branch, or run /pipeline-next first."
+    exit 1
+fi
+echo "OK: HEAD=$HEAD matches $STATE"
+```
+
+The check is <50 ms — run it as a reflex before every pipeline commit.
+This is the per-commit companion to the one-time **State-File Gate**
+below (which fires at branch creation / first commit / PR open).
 
 ```bash
 # 1. Stage the files you intend to commit FIRST.
@@ -324,6 +386,36 @@ git commit -m "..." && git log -1 --oneline
 The `&& git log -1 --oneline` is the load-bearing detail — if the commit
 silently failed, you see `<previous-commit-subject>` and know to re-stage.
 If it registered correctly, you see `<new-commit-hash> <new-subject>`.
+
+### The `git commit --amend` companion
+
+The `&& git log -1 --oneline` reflex detects a swallowed
+*create-a-new-commit* — a bounced commit leaves the PREVIOUS subject
+visible, which is the signal. It does **not** detect a bounced
+`git commit --amend`: after a bounced amend the OLD commit is still
+HEAD with its OLD subject, so a subject *is* shown and the reflex
+passes green on a failure.
+
+For `--amend` specifically, capture the pre-amend hash and assert it
+changed — amend always rehashes, so an unchanged HEAD is definitionally
+a bounce:
+
+```bash
+PRE=$(git rev-parse HEAD)
+git commit --amend -m "..."
+POST=$(git rev-parse HEAD)
+if [ "$PRE" = "$POST" ]; then
+    echo "FAIL: --amend bounced (HEAD unchanged). Re-stage and retry."
+    exit 1
+fi
+echo "OK: amend registered — $PRE -> $POST"
+```
+
+Also: any agent reporting a commit hash must obtain it from a live
+`git rev-parse HEAD` *after* the commit operation — never quote a hash
+printed earlier or planned. Observed failure: a fixer agent reported
+"amended commit <hash>" quoting the stale pre-amend hash after a
+bounced amend; the bounce was caught only on first principles.
 
 **Why this is mandatory**: observed **8 occurrences in a single 24-hour
 session** (djust PRs #989, #996, #1007, #1008, #1014, #1015, #1021, #1024).

@@ -377,7 +377,24 @@ If the change introduces:
 
 Suggest updating `CLAUDE.md` to reflect these (note in your output, don't modify CLAUDE.md directly unless the pipeline is for that project).
 
-#### 7. Quality checks
+#### 7. ADR status reconciliation
+
+If the project keeps Architecture Decision Records (`docs/adr/`,
+`docs/decisions/`, or similar) and this PR ships a feature an ADR
+proposed:
+
+- Flip that ADR's `**Status**:` from `Proposed` (or `Accepted`) to a
+  shipped marker — e.g. `Accepted — shipped in <version> (PR #NNNN)`.
+- Replace any `**Target version**:` line with the actual shipped
+  version (`**Shipped in**: <version>`).
+
+An ADR left at `Proposed` after its feature ships drifts silently — a
+later reader can't distinguish proposed-but-unbuilt from built-and-
+shipped. Flip it at the moment the feature lands, not at release time.
+If the project has an ADR-status audit (e.g. `make check-adr-status`),
+run it and confirm it passes.
+
+#### 8. Quality checks
 
 - No orphaned docs — if you renamed/removed a feature, remove or redirect its docs
 - No broken internal links — verify `[link text](path)` references are valid
@@ -453,6 +470,30 @@ Review the code changes in the current branch against the base branch.
 2. Read changed files for full context where needed
 3. **Check for a project PR checklist**: Look for `docs/PULL_REQUEST_CHECKLIST.md`, `PULL_REQUEST_CHECKLIST.md`, or `.github/PULL_REQUEST_TEMPLATE.md` in the project root. If found, use it as the primary review framework.
 
+### Environment premises (read before reviewing)
+
+A reviewer runs with fresh context and will otherwise re-derive — or
+silently miss — facts about repo state, producing false positives.
+Treat these as given, and when this stage runs as a subagent, **include
+this brief in the subagent prompt** so the reviewer doesn't have to
+guess:
+
+- **CHANGELOG may be intentionally absent from the diff.** Projects
+  using the two-commit shape land implementation+tests in one commit
+  and docs+CHANGELOG in a separate later commit. If a Documentation
+  stage is still pending in the state file, "CHANGELOG missing" is not
+  a defect — do not flag it.
+- **The branch base may be stale.** A branch opened many commits ago
+  has its `git diff <base>...HEAD` computed against an old base, which
+  is a different program than the merge will apply. Run
+  `git fetch origin && git rev-list --count HEAD..origin/<base>` — if
+  non-zero, state that the branch needs a rebase before the review is
+  trustworthy, rather than reviewing a stale diff.
+- **Some paths are intentionally gitignored** (e.g. `.claude/`,
+  generated artifacts, user-private config). A file "missing" because
+  it is gitignored is not a defect — verify with `git check-ignore`
+  before flagging an absent file.
+
 ### Review Categories
 
 **Correctness**:
@@ -468,6 +509,12 @@ Review the code changes in the current branch against the base branch.
 - Tests are deterministic (no flaky tests)
 - All untracked files that tests depend on are included in the diff
 - Edge cases covered (error conditions, boundary cases)
+- Frame-sensitive behavior — anything whose correctness depends on the
+  *caller's* stack frame (deprecation-warning `stacklevel`, traceback
+  depth, logger `stacklevel`) — has a test that asserts the frame the
+  warning/error points at, written at implementation time, not bolted
+  on in review. A change touching such a call site without that test
+  is a finding.
 
 **Security**:
 - No XSS, SQL injection, CSRF bypass, or secrets exposure
