@@ -543,6 +543,36 @@ Previous stage results:
 ...
 ```
 
+### Branch-checkout preamble for code-writing subagents
+
+Any subagent that **writes files** — Implementation, Address Findings
+(fixer), or any stage that creates or modifies the working tree — can
+inherit a stray HEAD from a sibling subagent (e.g. a Code Reviewer that
+checked out `pr-NNNN-review`). A fix-commit then lands on the wrong
+branch and needs a cherry-pick to recover.
+
+Prepend this preamble to every code-writing subagent prompt as the
+agent's **first action**, before any file edit:
+
+```bash
+EXPECTED_BRANCH="<branch_name from the state file>"
+git checkout "$EXPECTED_BRANCH" 2>/dev/null || { echo "ERROR: branch $EXPECTED_BRANCH not found"; exit 1; }
+[ "$(git branch --show-current)" = "$EXPECTED_BRANCH" ] || { echo "ERROR: HEAD is not $EXPECTED_BRANCH"; exit 1; }
+```
+
+This guarantees the subagent operates against the correct branch
+regardless of inherited HEAD state. It is the proactive companion to
+the **Branch-verify reflex** in the Pre-Commit Checklist (which catches
+a wrong branch reactively, at commit time): the preamble keeps the
+subagent from ever working on the wrong branch; the reflex is the
+backstop. Read-only subagents (Test Execution, Self-Review, Security
+Check, Code Review) do not need the preamble — they create no commits.
+
+A stage template's `subagent_prompt` for a code-writing stage should
+embed this preamble at the top; when building a prompt from the
+checklist (above), prepend it for any stage whose checklist creates or
+edits files.
+
 ### Step 4: Collect and extract verdict
 
 From the agent's output, look for verdict strings:
