@@ -35,6 +35,13 @@ The table at the top maps features to priorities (P0-P3). Parse it. Items with ~
 
 Scan for `### Milestone: vX.Y.Z — Title` sections. Within each, find `**Feature Name**` entries. Skip sections: Completed, Future, Contributing, Investigate, Differentiators, Parity Tracker.
 
+**Milestone-name format** (per project convention; check the project's ROADMAP for the canonical convention if it has one): two shapes are valid:
+
+- `vX.Y.Z` — an actual release (3-digit SemVer), e.g., `v0.9.1`, `v1.0.0`.
+- `vX.Y.Z-N` — a drain-bucket / planning iteration toward release `vX.Y.Z` (SemVer pre-release form), e.g., `v0.9.2-1`, `v0.9.2-2`. Drain buckets accumulate into the next release.
+
+Both shapes match the same heading regex (`### Milestone: v\S+ — Title`); the parser does not need to distinguish them. SemVer ordering puts `v0.9.2-1 < v0.9.2`, which matches reality (drain buckets ship before the release they're targeting).
+
 For each feature extract: name, milestone, section, priority (from matrix), issue number (#NNN if present), type (bugfix if section has "Bug Fix" or description mentions fixing/broken, else feature), and the full spec text.
 
 ### 4. Filter and select

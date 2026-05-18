@@ -57,6 +57,13 @@ Parse from three structural locations:
    followed by `**Feature Name**` bullet entries
 3. **Parity tracker** — tables that include a "Not started" column value
 
+**Milestone-name format**: `vX.Y.Z` is an actual release; `vX.Y.Z-N`
+is a drain-bucket / planning iteration (SemVer pre-release form).
+The grep / heading match works for either — substring filters like
+`grep "| v0.9.2-1 |"` or `grep "### Milestone: v0.9.2-1"` match the
+literal name. When the user passes `--milestone v0.9.2-1`, treat it
+exactly as written; do not normalize away the `-N` suffix.
+
 Apply `--milestone` filter if supplied.
 
 ### 3. For each candidate, map to an expected codebase path
