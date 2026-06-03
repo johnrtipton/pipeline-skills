@@ -145,6 +145,36 @@ This will:
 3. Repeat until all tasks are done
 4. Print the milestone summary
 
+### 8.5. Emit a per-PR retro artifact for each drain PR
+
+**MANDATORY — closes the gap that makes `/pipeline-retro` fail later.**
+Unlike `/pipeline-ship` (whose Stage 10 posts a retrospective), drain PRs —
+especially **grouped** PRs (Step C) — otherwise ship with no retro artifact.
+`/pipeline-retro` then hits a `RETRO_GATE_VIOLATION` for every drain PR and has
+to backfill by hand. Avoid that: after a drain PR merges, post a short retro
+comment on it, mirroring pipeline-ship Stage 10.
+
+```bash
+gh pr comment <PR> --body "$(cat <<'EOF'
+## Retrospective — PR #<PR> (pipeline-drain)
+
+**Task**: <milestone> — drained #<issues>.
+
+### Quality: <1-5>
+### What went well
+- ...
+### What didn't
+- ...
+### Verified
+<test/lint/CI evidence>
+EOF
+)"
+```
+
+For a grouped PR, one comment covers all drained issues. This makes the PR a
+valid Stage-2 input source for `/pipeline-retro` (no gate violation, no
+backfill).
+
 ### 9. Handle "close without code" issues
 
 During pipeline-run, if an issue is investigated and found to not need code:
@@ -218,10 +248,17 @@ because:
 - Stage 7 / Stage 8 reviews can spot-check audit claims rather than
   re-deriving from scratch.
 
+Before the milestone retro, post a per-PR retro comment on the grouped
+implementation PR (see Step 8.5) — the grouped PR is the most common source
+of `/pipeline-retro` gate violations because it merges several issues with no
+retro artifact.
+
 ### Step D — Single retro covers both PRs
 
 Run `/pipeline-retro --milestone vX.Y.Z-N`. The audit PR + drain PR are one
-coherent unit; the retro synthesizes across both.
+coherent unit; the retro synthesizes across both. The drain PR already carries
+its per-PR retro comment from Step 8.5, so Stage 2 of the retro finds a valid
+input source instead of flagging a gate violation.
 
 ## Integration
 
