@@ -122,10 +122,11 @@ do not merge. Run the missing stage, then retry.**
 STATUS=$(python3 -c "import json; print(json.load(open('.pipeline-state/<branch>.json'))['stages']['7']['status'])")
 [ "$STATUS" = "passed" ] || { echo "GATE FAIL: Stage 7 (Code Review) status=$STATUS, not passed. Run it before merge."; exit 1; }
 
-# Gate 2 — artifact: a Code Review comment must exist on the PR (the subagent
-# posts it via gh pr review --comment). Defends against a state file ticked
-# without the review actually happening.
-REVIEW=$(gh pr view "$PR" --json comments -q '.comments[].body' | grep -ic "code review\|REQUEST_CHANGES\|APPROVE")
+# Gate 2 — artifact: a Code Review must exist on the PR. The Stage 7 subagent
+# posts via `gh pr review --comment`, which lands in `.reviews[]` — NOT
+# `.comments[]`. Check BOTH arrays or the gate false-fails on every ship.
+# Defends against a state file ticked without the review actually happening.
+REVIEW=$(gh pr view "$PR" --json comments,reviews -q '[.comments[].body, .reviews[].body] | join("\n")' | grep -ic "code review\|REQUEST_CHANGES\|APPROVE")
 [ "$REVIEW" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Code Review artifact. Run Stage 7 before merge."; exit 1; }
 ```
 
@@ -134,7 +135,7 @@ of the pipeline: a per-PR retro comment must exist on the PR within the run. If
 absent, the pipeline is not complete — run Stage 10.
 
 ```bash
-RETRO=$(gh pr view "$PR" --json comments -q '.comments[].body' | grep -ic "retrospective\|RETRO_COMPLETE\|quality:")
+RETRO=$(gh pr view "$PR" --json comments,reviews -q '[.comments[].body, .reviews[].body] | join("\n")' | grep -ic "retrospective\|RETRO_COMPLETE\|quality:")
 [ "$RETRO" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Retrospective artifact. Run Stage 10."; exit 1; }
 ```
 
