@@ -85,7 +85,7 @@ The ship template has **10 stages** (compared to 14 for a full feature pipeline)
 | 6 | **Commit & PR** | Stage, commit, push, create PR | `PR_CREATED` / `PR_EXISTS` |
 | 7 | **Code Review** | Subagent reviews the PR, posts to GitHub | `APPROVE` / `REQUEST_CHANGES` |
 | 8 | **Review Verdict** | If changes requested → fix and re-review | `APPROVE` |
-| 9 | **Merge PR** | Verify CI, squash-merge, delete branch | `PR_MERGED` |
+| 9 | **Merge PR** | **Pre-merge gate** (Code Review artifact + state), verify CI, squash-merge, delete branch | `PR_MERGED` |
 | 10 | **Retrospective** | Quality rating, lessons learned, post to GitHub | `RETRO_COMPLETE` |
 
 Stages 2-4 (Test, Self-Review, Security) can run in **parallel** since they're all read-only.
@@ -103,6 +103,43 @@ Refer to `pipeline-shared/SKILL.md` for detailed procedures on each stage. The s
 - **No Change Detection** — folded into Inventory (stage 1)
 - **No Conflict Check** — folded into Commit & PR (stage 6)
 - **Inventory stage** replaces the planning artifact with a changes summary
+
+### MANDATORY Pre-Merge Programmatic Gate (Stage 9)
+
+Code Review (Stage 7) and Retrospective (Stage 10) are load-bearing quality
+gates, but the text imperatives are a **soft gate** — under context pressure or
+a "ship it quick" frame the executor can skip the read entirely. This happened
+on GSA-TTS/usai-admin-portal PR #13 (merged with neither stage run; post-hoc
+review then caught a 🔴 critical auth-exemption on a credential endpoint,
+needing 3 recovery PRs). Mirror `pipeline-run`'s post-commit gates with a
+**programmatic** check that physically blocks the merge.
+
+**Run this at the START of Stage 9, before `gh pr merge`. If it fails, STOP —
+do not merge. Run the missing stage, then retry.**
+
+```bash
+# Gate 1 — state file: Code Review stage must have passed.
+STATUS=$(python3 -c "import json; print(json.load(open('.pipeline-state/<branch>.json'))['stages']['7']['status'])")
+[ "$STATUS" = "passed" ] || { echo "GATE FAIL: Stage 7 (Code Review) status=$STATUS, not passed. Run it before merge."; exit 1; }
+
+# Gate 2 — artifact: a Code Review comment must exist on the PR (the subagent
+# posts it via gh pr review --comment). Defends against a state file ticked
+# without the review actually happening.
+REVIEW=$(gh pr view "$PR" --json comments -q '.comments[].body' | grep -ic "code review\|REQUEST_CHANGES\|APPROVE")
+[ "$REVIEW" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Code Review artifact. Run Stage 7 before merge."; exit 1; }
+```
+
+**Retrospective (Stage 10)** runs post-merge, so its gate is checked at the END
+of the pipeline: a per-PR retro comment must exist on the PR within the run. If
+absent, the pipeline is not complete — run Stage 10.
+
+```bash
+RETRO=$(gh pr view "$PR" --json comments -q '.comments[].body' | grep -ic "retrospective\|RETRO_COMPLETE\|quality:")
+[ "$RETRO" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Retrospective artifact. Run Stage 10."; exit 1; }
+```
+
+`--no-merge` runs skip Gate 1/2 (no merge happens) but should still reach
+Stage 7 — the whole point of `--no-merge` is to stop *after* Code Review.
 
 ### Resume
 
