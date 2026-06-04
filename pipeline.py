@@ -80,6 +80,49 @@ def detect_profile(project: str) -> str:
     return "generic"
 
 
+def detect_default_branch(project: str) -> str:
+    """Resolve the repo's default branch — mirrors the pipeline-* skills' chain.
+
+    Order: CLAUDE.md pipeline-config ``default_branch`` -> ``origin/HEAD``
+    symbolic ref -> ``git remote show origin`` HEAD branch -> ``main`` fallback.
+    Never assume ``main``/``master``; the literal is only the last resort.
+    """
+    project_path = Path(project)
+
+    # 1. CLAUDE.md pipeline-config default_branch
+    claude_md = project_path / "CLAUDE.md"
+    if claude_md.exists():
+        m = re.search(r"^\s*-?\s*default_branch:\s*(\S+)", claude_md.read_text(),
+                      re.MULTILINE)
+        if m:
+            return m.group(1)
+
+    # 2. origin/HEAD symbolic ref (fails on many repos — must fall through)
+    try:
+        r = subprocess.run(
+            ["git", "-C", project, "symbolic-ref", "--short",
+             "refs/remotes/origin/HEAD"],
+            capture_output=True, text=True, timeout=10)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip().removeprefix("origin/")
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
+    # 3. ask the remote
+    try:
+        r = subprocess.run(["git", "-C", project, "remote", "show", "origin"],
+                           capture_output=True, text=True, timeout=15)
+        if r.returncode == 0:
+            m = re.search(r"HEAD branch:\s*(\S+)", r.stdout)
+            if m and m.group(1) != "(unknown)":
+                return m.group(1)
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
+    # 4. last resort
+    return "main"
+
+
 def load_profile(profile_name: str) -> dict:
     """Load a profile, merging with generic base if not already generic."""
     generic_path = PROFILES_DIR / "generic.json"
@@ -793,8 +836,9 @@ def run_auto(project: str, roadmap: str | None, milestone: str | None,
         print("  No tasks match the filters.")
         return
 
-    # Determine target branch
-    target_branch = f"dev/{milestone}" if milestone else "main"
+    # Determine target branch (resolve the default branch — never hard-code "main")
+    default_branch = detect_default_branch(project)
+    target_branch = f"dev/{milestone}" if milestone else default_branch
 
     # Check status of each task
     print(f"{'═' * 60}")
