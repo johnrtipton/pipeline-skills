@@ -6,12 +6,30 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
+| **P1** | validate the family on a foreign repo | The family has only ever been dogfooded; the one externally-sourced bug (#36) proved real external use finds what self-use misses. Run pipeline-init→next→run→retro end-to-end on a non-`main`/non-python repo and capture every gap as an issue | v0.5.0 |
+| **P1** | adoption quickstart for external repos | After 4 milestones there is no guide for adopting the family in someone else's repo; write one and verify `pipeline-init` on a fresh clone | v0.5.0 |
+| **P2** | release process and first tags | 0 git tags after 4 milestones — nothing is consumable/versioned; establish a tagging + release flow and cut the first tag | v0.5.0 |
+| **P3** | untracked-files gap in worktree-restore reflex | `git restore` doesn't remove untracked files a subagent leaves (#40) | v0.5.0 |
 
-_No active tasks — v0.4.0 shipped (PRs #39, #41). Open: #40 (untracked-files gap) + the larger drift-guard ideas in `## Future`; run `/pipeline-strategy` to plan v0.5.0._
+_Chosen via strategy session [2026-06-04-v0-4-end](docs/strategy-sessions/2026-06-04-v0-4-end.md) (Path 2 — Outward pivot). See [ADR-0002](docs/adr/0002-outward-pivot.md)._
 
 ## Milestones
 
-_No active milestone. See `## Completed` for v0.4.0._
+### Milestone: v0.5.0 — Outward pivot
+
+**validate the family on a foreign repo**
+Take a real repository that is NOT this one — ideally `master`-default and/or non-python — and run the full family end-to-end: `/pipeline-init`, then `/pipeline-next`, `/pipeline-run`, `/pipeline-retro`. Record every place the family assumes pipeline-skill's own conventions, branch, or language. File each gap as an issue. The deliverable is a validation report under `docs/` + the issues, not a green checkmark. Tracks the twice-deferred broaden-dogfooding candidate. Acceptance: a foreign-repo run report exists and any blocking gaps are filed.
+
+**adoption quickstart for external repos**
+Write `docs/adoption.md` (or a README section) that walks an external user from clone to first shipped PR: install the skills, run `/pipeline-init`, what the pipeline-config block means, the next→run→retro loop. Verify the steps against a fresh clone. Acceptance: a new user can follow it without reading the skill internals.
+
+**release process and first tags**
+Define how this repo versions and releases (it has 0 tags despite 4 shipped milestones). Document the flow (tag `vX.Y.Z` at milestone close, what the tag includes) and cut the first tag retroactively for the shipped milestones. Acceptance: `git tag` is non-empty and a release process is documented.
+
+**untracked-files gap in worktree-restore reflex**
+Extend the #36 worktree-restore reflex (pipeline-run + template prompts) to also clear untracked files a subagent leaves — a guarded `git clean -fd` or a post-restore re-check — so a build/scp after a subagent can't pick up stray files. Tracks issue (#40).
+
+## Completed` for v0.4.0._
 
 ## Completed
 

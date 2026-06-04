@@ -79,6 +79,8 @@ PR #39's review noted that `git restore --staged --worktree .` only touches trac
 
 - [ ] Worktree-restore reflex should also clear untracked files — Action Tracker #9 (GitHub #40)
 
+**→ Forward**: strategy session [2026-06-04-v0-4-end](docs/strategy-sessions/2026-06-04-v0-4-end.md) → **v0.5.0 "Outward pivot"** (Path 2). After 4 inward milestones, [ADR-0002](docs/adr/0002-outward-pivot.md) shifts to proving + packaging the family (foreign-repo validation, adoption quickstart, first release/tags). #40 rides along; inward drift ideas deferred.
+
 ## v0.3.0 — Executable gates + CI (PRs #32, #33, #34)
 
 **Date**: 2026-06-04
