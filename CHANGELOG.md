@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- Review subagents no longer leave the executor's working tree on the base
+  branch: the Code Review `subagent_prompt` in all four templates now restores
+  HEAD on exit, and pipeline-run gains a worktree-restore reflex before any
+  build/scp/ship that follows a subagent (#36).
+
 ### Added
 - `scripts/pipeline-gates.sh` — the pipeline quality gates as executable
   functions (Gate 1-4 + pipeline-ship pre-merge), per ADR-0001 (#28).
