@@ -493,6 +493,13 @@ Create a branch, commit changes, push, and create a pull request.
 
 10. **Verify PR body**: Re-read the PR description against `git diff <pr_target_branch>...HEAD --stat`. The PR body must not mention features, template tags, error codes, or APIs that don't exist in the diff. Must not cite incorrect test counts or file counts, or use terminology that contradicts the code. If discrepancies are found, fix with `gh pr edit <pr_number> --body '<corrected body>'`.
 
+11. **Substitute `#TBD` PR-number placeholders (#6)**: when a committed docs change (ROADMAP/RETRO/CHANGELOG entry, or in-repo doc) needs to reference *this* PR, you can't know the number until after `gh pr create`. Write the placeholder `#TBD` (or `PR #TBD`) in the commit, then after the PR exists substitute the real number and amend:
+    ```bash
+    bash scripts/substitute-pr-number.sh <pr_number> <file> [file ...]   # explicit files (no-args lists candidates, writes nothing)
+    git add -u && git commit --amend --no-edit && git push --force-with-lease
+    ```
+    The script is portable (bash 3.2 / BSD sed) and rejects a non-numeric argument. Files are explicit by design: the `#TBD` marker also appears as prose (e.g. a ROADMAP entry describing this feature), which must not be rewritten. This avoids the manual find-replace that otherwise leaves stale `#TBD` markers in merged docs.
+
 ### Gate
 - **Pass**: `PR_CREATED: <full PR URL>` or `PR_EXISTS: <full PR URL>` or `PR_SKIPPED: <reason>`
 - **Fail**: Stop the pipeline if push or PR creation fails unexpectedly
