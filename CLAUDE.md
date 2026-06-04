@@ -194,3 +194,16 @@ No tests, no build step, no linter configured. This is a standalone Python 3.12+
 - `parse_roadmap()` and `parse_priority_matrix()` parse structured ROADMAP.md files with milestone headings and priority tables — these are tightly coupled to a specific markdown format
 - Templates are framework-agnostic; framework-specific checks are injected at runtime via profiles
 - Also published as a flexion plugin at `flexion-ai-claude-plugin/flexion-ai-pipeline/`
+
+<!-- pipeline-config: managed by /pipeline-init -->
+## Pipeline configuration
+
+- default_branch: main
+- pr_target_branch: main
+- test_command:            # none — standalone Python 3.12+ stdlib script, no test runner
+- lint_command:            # none configured
+- build_command:           # none — no build step
+- venv_path:               # none
+- changelog: keep-a-changelog
+- state_templates: templates/   # this repo IS the canonical template source; pipeline-* skills resolve templates via the directory containing pipeline.py, so no .pipeline-templates/ copies are created here (they would be stale duplicates)
+<!-- /pipeline-config -->
