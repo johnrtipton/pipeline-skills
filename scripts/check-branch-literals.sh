@@ -19,12 +19,28 @@ fail=0
 # Match real commands (push/pull/checkout/diff/rev-parse) against a literal
 # main|master; exclude any line referencing $BASE (the parameterized form and
 # the BASE=...main fallback both legitimately contain "main").
-skill_hits=$(grep -rnE \
-  'git (push|pull) origin (main|master)\b|git checkout (main|master)\b|checkout -B [^ ]+ origin/(main|master)\b|git (diff|rev-parse)[^`]*origin/(main|master)\b' \
-  skills/*/SKILL.md 2>/dev/null | grep -v 'BASE' || true)
-if [ -n "$skill_hits" ]; then
+#
+# #29: a prose mention wrapped in inline code — e.g. `git diff origin/main` —
+# must NOT trip the guard, but a real command in a fenced bash block must. So we
+# STRIP inline-code spans (backtick-delimited) from each candidate line before
+# the final decision: fenced-block commands aren't single-backtick-wrapped and
+# survive the strip; inline-code prose disappears.
+PATTERN='git (push|pull) origin (main|master)\b|git checkout (main|master)\b|checkout -B [^ ]+ origin/(main|master)\b|git (diff|rev-parse)[^`]*origin/(main|master)\b'
+raw=$(grep -rnE "$PATTERN" skills/*/SKILL.md 2>/dev/null | grep -v 'BASE' || true)
+skill_hits=""
+while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  content="${hit#*:*:}"                                   # strip "file:lineno:" prefix
+  stripped=$(printf '%s' "$content" | sed 's/`[^`]*`//g') # drop inline-code spans
+  if printf '%s' "$stripped" | grep -qE "$PATTERN"; then
+    skill_hits="${skill_hits}${hit}"$'\n'
+  fi
+done <<EOF
+$raw
+EOF
+if [ -n "$(printf '%s' "$skill_hits" | tr -d '[:space:]')" ]; then
   echo "✗ Hard-coded default branch in skill command (use \"\$BASE\"):"
-  echo "$skill_hits" | sed 's/^/    /'
+  printf '%s' "$skill_hits" | sed '/^$/d; s/^/    /'
   fail=1
 fi
 
