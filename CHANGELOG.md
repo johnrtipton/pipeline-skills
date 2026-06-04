@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- `scripts/pipeline-gates.sh` — the pipeline quality gates as executable
+  functions (Gate 1-4 + pipeline-ship pre-merge), per ADR-0001 (#28).
+
 ## [v0.1.0]
 
 ### Added
