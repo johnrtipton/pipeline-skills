@@ -16,7 +16,7 @@ issue or be explicitly closed with a reason.
 | 7 | `check-branch-literals.sh` diff/rev-parse regex can false-positive on backtick-wrapped prose | Retro v0.2.0 / PR #21 | #29 | Closed | Resolved in PR #41 (v0.4.0) — strips inline-code spans before matching |
 | 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Closed | Resolved in PR #39 (v0.4.0) — template restore-HEAD step + pipeline-run worktree-restore reflex |
 | 9 | Worktree-restore reflex doesn't remove untracked files left by a subagent | Retro v0.4.0 / PR #39 | #40 | Closed | Resolved in PR #49 (v0.5.0) — `git clean -fd` + re-verify |
-| 10 | `detect_default_branch` returns `main` for a `master`-default repo with no `origin/HEAD` | Retro v0.5.0 / PR #46 | #45 | Open | **Found by the v0.5.0 foreign-repo validation** — branch-agnosticism hole at the harness entry point; v0.6.0 lead |
+| 10 | `detect_default_branch` returns `main` for a `master`-default repo with no `origin/HEAD` | Retro v0.5.0 / PR #46 | #45 | Closed | Resolved in PR #53 (v0.6.0) — origin-probe + current-branch fallback; validated end-to-end in PR #55 |
 
 <!-- Milestone retro entry template:
 ## <milestone> — <Title> (PRs #NN–#MM)
@@ -27,6 +27,52 @@ issue or be explicitly closed with a reason.
 ### Review Stats
 ### Open Items
 -->
+
+## v0.6.0 — Follow through on the pivot (PRs #53, #54, #55)
+
+**Date**: 2026-06-04
+**Scope**: Continued ADR-0002. Fixed the entry-point branch bug v0.5.0 found (#45), proved the full family end-to-end on a real foreign repo including the PR stages, and flipped both ADRs to Accepted.
+**Tests at close**: n/a — CI green on every PR; end-to-end validated on a live foreign repo.
+
+### What We Learned
+
+**1. The outward pivot's loop closed in one milestone-pair.**
+v0.5.0's validation *found* #45 (`detect_default_branch` wrong on `master`/no-origin); v0.6.0 *fixed* it (PR #53, parity with the pipeline-init SKILL chain) and *proved* the fix end-to-end on a real throwaway `master`/Node GitHub repo — including the PR-create-against-`master` → review → squash-merge stages the v0.5.0 local-only run could not exercise (PR #55). Zero new family gaps surfaced. Found → fixed → validated, with the validation done on a genuinely foreign remote, not a simulation.
+
+**Action taken**: closed — #45 resolved in PR #53; end-to-end validation in PR #55.
+
+**2. ADR status drift resolved.**
+ADR-0001 (executable gates) and ADR-0002 (outward pivot) were both implemented and in force but still marked `Proposed` — the exact drift the pipeline-shared Documentation stage's ADR-reconciliation step exists to catch. Flipped both to `Accepted` with their implementing versions/PRs cited.
+
+**Action taken**: closed — ADR statuses flipped in PR #54.
+
+### Insights
+
+- **The harness Bash shell runs with `noclobber` ON** (a Claude Code default, not in the user's dotfiles and not user-configurable). `cat > existing_file` silently no-ops, which bit the validation setup twice. The durable fix is operator-side — use the Write/Edit tools, not `>` to existing files. (The pipeline skills' own bash snippets use `>`/heredoc redirects; a future cleanup could make them `>|`-safe, but most write new files or use git, so it's low-signal — noted, not filed.)
+- **A "throwaway repo" validation needs the `delete_repo` gh scope to clean up.** The default `gh` token lacks it (403 on delete); `gh auth refresh -h github.com -s delete_repo` or the web UI is required. Worth mentioning in any future validation runbook.
+- **Two milestones converted a found bug into a proven fix** — the clearest demonstration this session that the retro→strategy→run→retro loop drives real correction, not just documentation.
+
+### Review Stats
+
+| Metric | #53 | #54 | #55 | Total |
+|--------|-----|-----|-----|-------|
+| Subagent code reviews | 1 | 0 (docs) | 0 (docs) | 1 |
+| Review verdict | APPROVE | self/APPROVE | self/APPROVE | — |
+| Regression cases verified | 5 | — | — | 5 |
+| 🔴 Findings | 0 | 0 | 0 | 0 |
+| New family gaps found | 0 | 0 | 0 | 0 |
+| Real foreign-repo PRs exercised | — | — | 1 (merged) | 1 |
+| CI runs (green) | 1 | 1 | 1 | 3 |
+
+### Process Improvements Applied
+
+**Harness**: `detect_default_branch` gained an origin-probe + current-branch fallback (PR #53).
+**Docs**: `docs/validation/2026-06-04-foreign-repo-e2e.md` end-to-end report (PR #55).
+**ADR**: ADR-0001 + ADR-0002 → Accepted (PR #54).
+
+### Open Items
+
+- None. Action Tracker has no open rows; 0 open issues at milestone close.
 
 ## v0.5.0 — Outward pivot (PRs #46, #47, #48, #49)
 
@@ -77,7 +123,7 @@ PR #39's Code Review flagged that the #36 restore reflex only handled tracked fi
 
 ### Open Items
 
-- [ ] `detect_default_branch` foreign-repo bug — Action Tracker #10 (GitHub #45) — **v0.6.0 lead**
+- [x] `detect_default_branch` foreign-repo bug — Action Tracker #10 (GitHub #45) — resolved in v0.6.0 (PR #53; validated end-to-end PR #55)
 
 **→ Forward**: strategy session [2026-06-04-v0-5-end](docs/strategy-sessions/2026-06-04-v0-5-end.md) → **v0.6.0 "Follow through"** (Path 1): fix #45, fuller end-to-end foreign-repo validation, flip ADR-0001/0002 to Accepted. Continues ADR-0002; no new ADR.
 
