@@ -99,11 +99,19 @@ Canonicalized from v0.9.1 retro / Action Tracker #180 / GitHub #1172.
 
 ## Stage 1: Branch and Environment Setup
 
-The Environment Check stage needs care when local `main` is ahead of `origin/main`:
+The Environment Check stage needs care when local default branch is ahead of origin:
 
-1. **Check for unpushed commits**: `git log origin/main..main --oneline`. If there are any, push main first (`git push origin main`) before creating the feature branch. Otherwise the branch will be based on stale code.
-2. **Create the branch**: `git checkout -B {branch_name} origin/main` (now that origin/main is current).
-3. **Install dependencies**: Always re-run `uv pip install -r requirements.txt` (or the project's equivalent) after branching. The branch may have different dependency versions than what's currently installed in `.venv`.
+1. **Resolve the repo's default branch** — from the CLAUDE.md pipeline-config `default_branch`, else `git symbolic-ref refs/remotes/origin/HEAD`, else `git remote show origin`; do NOT assume main/master.
+   ```bash
+   # Resolve the repo's default branch (pipeline-config → origin/HEAD → remote → fallback). Never assume main/master.
+   BASE=$(sed -n 's/^- *default_branch: *//p' CLAUDE.md 2>/dev/null | awk 'NR==1{print $1}')
+   [ -z "$BASE" ] && BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+   [ -z "$BASE" ] && BASE=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+   [ -z "$BASE" ] && BASE=main
+   ```
+2. **Check for unpushed commits**: `git log "origin/$BASE..$BASE" --oneline`. If there are any, push the default branch first (`git push origin "$BASE"`) before creating the feature branch. Otherwise the branch will be based on stale code.
+3. **Create the branch**: `git checkout -B {branch_name} "origin/$BASE"` (now that origin/$BASE is current).
+4. **Install dependencies**: Always re-run `uv pip install -r requirements.txt` (or the project's equivalent) after branching. The branch may have different dependency versions than what's currently installed in `.venv`.
 
 ## Parallel Stages
 
@@ -708,13 +716,18 @@ grep "| v<milestone>" ROADMAP.md | grep -v "✅" | grep -v "~~" | grep -v "^|.*�
 If zero tasks remain (or the user specified this is a milestone boundary):
 - Remind the user: "Milestone vX.Y.Z appears complete. Run `/pipeline-retro --milestone vX.Y.Z` to write the milestone retrospective and update the Action Tracker."
 
-### 3. Push main if needed
+### 3. Push default branch if needed
 
-If main has unpushed commits (from the merge), push them:
+If the default branch has unpushed commits (from the merge), push them:
 ```bash
-git log origin/main..main --oneline | head -1
+# Resolve the repo's default branch (pipeline-config → origin/HEAD → remote → fallback). Never assume main/master.
+BASE=$(sed -n 's/^- *default_branch: *//p' CLAUDE.md 2>/dev/null | awk 'NR==1{print $1}')
+[ -z "$BASE" ] && BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+[ -z "$BASE" ] && BASE=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+[ -z "$BASE" ] && BASE=main
+git log "origin/$BASE..$BASE" --oneline | head -1
 # If non-empty:
-git push origin main
+git push origin "$BASE"
 ```
 
 ## After Completion — Continue to Next Task (--all mode)

@@ -239,7 +239,8 @@ Claude:
   [stage 6] ToolSearch → load schema → call ws_throttle → verify delay
             takes effect, capture stats, clear, verify cleared.
   [stage 7] gh pr merge --squash --delete-branch
-  [stage 8] git checkout master && git pull
+  [stage 8] git checkout <default-branch> && git pull
+            (the repo's default branch from pipeline-config; not hard-coded)
   
 Claude: "Merged as PR #N. Next?"
 ```

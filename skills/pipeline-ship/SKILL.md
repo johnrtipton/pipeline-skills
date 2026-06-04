@@ -46,6 +46,25 @@ Use this when you've been coding interactively and want to formalize, review, an
    fi
    ```
    Observed cost: djust PR #836 pipeline-ship found 30+ stale `D` entries because the worktree was populated before the branch was rebased onto current main; had to `git reset --hard HEAD` before Stage 1 inventory was meaningful. A dozen `D` entries on a branch that claims to add code is a strong staleness signal.
+2.5. **Stacked-PR check** — if the branch has merge commits pulling in another open PR's branch, surface the dependency before Stage 9 (Merge) discovers it as a 20+ conflict rebase:
+   ```bash
+   # Resolve the repo's default branch (pipeline-config → origin/HEAD → remote → fallback). Never assume main/master.
+   BASE=$(sed -n 's/^- *default_branch: *//p' CLAUDE.md 2>/dev/null | awk 'NR==1{print $1}')
+   [ -z "$BASE" ] && BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+   [ -z "$BASE" ] && BASE=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+   [ -z "$BASE" ] && BASE=main
+   MERGES=$(git log --merges --pretty=format:'%h %s' "origin/$BASE..HEAD" 2>/dev/null)
+   if [ -n "$MERGES" ]; then
+       echo "WARNING: branch contains merge commits from origin/$BASE..HEAD:"
+       echo "$MERGES" | sed 's/^/  /'
+       echo "If any source branch matches an open PR (gh pr list --state open),"
+       echo "this PR is STACKED. After the base PR squash-merges to the default branch, this"
+       echo "branch's history will diverge and Stage 9's merge will hit"
+       echo "tree-equivalent-but-commit-different conflicts on every overlapping file."
+       echo "Plan: merge base PR first, then rebase or merge the default branch here BEFORE Stage 6."
+   fi
+   ```
+   Observed cost: max-companion PR #10 was stacked on PR #9 via merge commit `f445b66`. After PR #9 squash-merged, the resume of PR #10's pipeline-ship hit 21 conflicts across 7 files — all "same content, different commit identity." Resolvable but cost ~30 min of focused conflict-resolution work that a Step 2.5 warning would have surfaced upfront.
 3. Check for existing changes:
    - `git status -s` — must have modified/added/untracked files OR recent commits not on target
    - If no changes found, abort: "Nothing to ship."

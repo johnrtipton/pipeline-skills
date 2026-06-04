@@ -448,7 +448,14 @@ Create a branch, commit changes, push, and create a pull request.
 
 9. **Create PR**: `gh pr create --base <pr_target_branch> --title "<type>: <description>" --body '<summary>'`
    - If PR already exists: `echo 'PR already exists'`
-   - If task is linked to a GitHub issue, include `Closes #<issue-number>` in the PR body
+   - If task is linked to a GitHub issue, include `Closes #<issue-number>` in the PR body.
+   - **For multiple issues, emit ONE `Closes #X` line per issue, NOT a comma-separated list.** GitHub's auto-close parser only honors the first issue in `Closes #X, #Y, #Z` and silently ignores the rest. Observed cost: max-companion v0.3.0-1 drain shipped 4 PRs with comma-separated `Closes`; 7 of 11 issues had to be manually closed with `gh issue close` post-merge. Correct shape:
+     ```
+     Closes #12
+     Closes #13
+     Closes #14
+     ```
+     (`closes #X, closes #Y, closes #Z` with the keyword repeated also works.)
 
 10. **Verify PR body**: Re-read the PR description against `git diff <pr_target_branch>...HEAD --stat`. The PR body must not mention features, template tags, error codes, or APIs that don't exist in the diff. Must not cite incorrect test counts or file counts, or use terminology that contradicts the code. If discrepancies are found, fix with `gh pr edit <pr_number> --body '<corrected body>'`.
 
@@ -681,6 +688,11 @@ Approve and merge the pull request.
 0. **Verify CI**: Run `gh pr checks <pr_number>`. All checks must pass before merging.
    - If CI is failing due to changes in this PR, do NOT merge — go back and fix the issue.
    - If CI is failing due to pre-existing issues (not introduced by this PR), document it in a PR comment (`gh pr comment <pr_number> --body 'CI note: <description of pre-existing failure>'`) and proceed.
+   - **Note on `gh pr checks` field names:** `gh pr checks --json` exposes status as `.state` (values: `SUCCESS`, `FAILURE`, `PENDING`), NOT `.conclusion`. Polling loops like `until [ "$(gh pr checks N --json conclusion ...)" != "" ]` will run forever silently because the field is always empty. Use `.state` for PR-level checks. (Distinct from `gh run view --json`, which DOES use `.conclusion`.)
+
+0.5. **Verify the PR is not still a draft**: Run `gh pr view <pr_number> --json isDraft -q .isDraft`. If `true`, `gh pr merge` will fail with `GraphQL: Pull Request is still a draft (mergePullRequest)`.
+   - If the PR is intentionally a draft (user wants `--no-merge` semantics), stop here.
+   - Otherwise, mark it ready: `gh pr ready <pr_number>`. Observed cost: max-companion PR #10 merge tripped on this; saved by manual `gh pr ready 10`. The skill catches it now so the merge step doesn't fail at the gate.
 
 1. Merge: `gh pr merge <pr-number> --squash --delete-branch`
    - Note: Do NOT run `gh pr review --approve` — GitHub blocks self-approval on PRs you authored. The review comment from the Code Review stage serves as the review record.
