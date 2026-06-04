@@ -12,8 +12,9 @@ issue or be explicitly closed with a reason.
 | 3 | run_auto branch-agnostic auto-mode naming (`pipeline.py:798`) | PR #10 | #11 | Closed | Resolved in PR #21 (v0.2.0) — `detect_default_branch()` |
 | 4 | Stage-5 enumerated-unit inventory gate (README/CLAUDE.md/install.sh rot) | PRs #12–#15 | — | Closed | Resolved in PR #15 — `pipeline-shared` step 4.5 + feature/bugfix/refactor/ship templates |
 | 5 | Self-initialize the pipeline-skill repo (no ROADMAP/RETRO/config existed) | Retro v0.1.0 | — | Closed | Resolved in PR #16 — ROADMAP, RETRO, CHANGELOG, pipeline-config block |
-| 6 | Consolidate pipeline-run inline gates into `scripts/pipeline-gates.sh` (dangling canonical reference) | Retro v0.2.0 / PR #24 | #28 | Open | |
-| 7 | `check-branch-literals.sh` diff/rev-parse regex can false-positive on backtick-wrapped prose | Retro v0.2.0 / PR #21 | #29 | Open | Latent — no current trigger |
+| 6 | Consolidate pipeline-run inline gates into `scripts/pipeline-gates.sh` (dangling canonical reference) | Retro v0.2.0 / PR #24 | #28 | Closed | Resolved in PR #32 (v0.3.0) — executable gate functions |
+| 7 | `check-branch-literals.sh` diff/rev-parse regex can false-positive on backtick-wrapped prose | Retro v0.2.0 / PR #21 | #29 | Open | v0.4.0 drift cluster |
+| 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Open | **Top v0.4.0 priority — broke a downstream build.** Fix: review subagents restore HEAD on exit (template prompt) + executor re-verifies worktree==HEAD before build/scp |
 
 <!-- Milestone retro entry template:
 ## <milestone> — <Title> (PRs #NN–#MM)
@@ -24,6 +25,59 @@ issue or be explicitly closed with a reason.
 ### Review Stats
 ### Open Items
 -->
+
+## v0.3.0 — Executable gates + CI (PRs #32, #33, #34)
+
+**Date**: 2026-06-04
+**Scope**: Strategy-chosen Path 1. Turned the pipeline's prose quality gates into executable artifacts: `scripts/pipeline-gates.sh` (#28), a template structure validator (`make validate-templates`), and a GitHub Actions CI workflow enforcing both on every PR. Established ADR-0001.
+**Tests at close**: n/a — no unit suite; CI (`make check` + script syntax + pipeline.py parse) is now the enforcement surface, green on every PR.
+
+### What We Learned
+
+**1. The gates validated their own construction (dogfooding closed the loop).**
+From PR #32 onward every commit was checked by the gate functions it shipped: Gate 1 (changelog-boundary) on each implementation commit, Gate 2 (docs-only) on each docs commit, `gate_premerge` before each merge, Gate 4 (retro-artifact) after each retro. ADR-0001's goal — enforcement that doesn't depend on the model remembering — is met, and PR #34's CI ran green on its own diff.
+
+**Action taken**: closed — #28 resolved (PR #32); CI enforcing it (PR #34).
+
+**2. Review depth caught a fail-open bug a checker must never have.**
+PR #33's Code Review returned REQUEST_CHANGES (the project's first): a template that was valid JSON but not an object crashed the validator with an uncaught exception that escaped the per-file loop, silently skipping every template after it. A validator that stops checking is worse than none. Fixed (`isinstance` guard + `continue`) and re-verified before merge.
+
+**Action taken**: closed — fixed in PR #33 (commit 3483ca9), re-verified against the exact failing case.
+
+**3. Review subagents can silently dirty the executor's working tree.**
+This milestone leaned on Code Review subagents (#32, #33). A sibling project (djustlive v0.4.0) reported that read-only review subagents `git checkout` the branch to read the diff and leave the executor's tree on `main`, so a subsequent build/scp ships stale files — it broke a base-image build there, recurring across 5 PRs. No breakage here only because the executor re-synced (`git checkout main`) after every merge; the risk is systemic and unguarded for build/scp steps.
+
+**Action taken**: Open — tracked in Action Tracker #8 (GitHub #36).
+
+### Insights
+
+- **Self-referential validation is uniquely available to a tooling repo and uniquely high-signal**: the gates checked the gates, the validator validated itself, CI tested itself. Each caught real issues during its own construction.
+- **Building a checker teaches you your own data.** The template validator immediately surfaced a structural assumption I'd have missed — `retro-state.json` legitimately uses fractional sub-stage keys (3.5/4.5) — forcing the correct "numeric, strictly-ascending" rule instead of "contiguous integers."
+- **Cross-project retro signal is valuable.** #36 arrived mid-milestone from djustlive, a different consumer of these skills. Bugs found in one consumer should flow back to the canonical repo — the pipeline-* family has more than one user now.
+
+### Review Stats
+
+| Metric | #32 | #33 | #34 | Total |
+|--------|-----|-----|-----|-------|
+| Subagent code reviews | 1 | 1 | 0 (inline + live CI) | 2 |
+| Review verdict | COMMENT | REQUEST_CHANGES | APPROVE | — |
+| Bugs caught & fixed pre-merge | 0 | 1 | 0 | 1 |
+| Calibration fixes during build | 2 | 1 | 0 | 3 |
+| CI runs (green) | — | — | 1 | 1 |
+| Tests added | 0 (no suite) | 0 | 0 | 0 |
+
+### Process Improvements Applied
+
+**Scripts**: `scripts/pipeline-gates.sh` (PR #32), `scripts/validate-templates.sh` (PR #33).
+**CI**: `.github/workflows/ci.yml` — `make check` + script syntax + pipeline.py parse on every PR/push (PR #34).
+**Skills**: pipeline-run "Where to place the gates" now references the executable script (PR #32).
+**Makefile**: `make check` now runs the branch-literal guard + template validator (PRs #32, #33).
+**ADR**: ADR-0001 (executable gates) established (strategy session capture).
+
+### Open Items
+
+- [ ] Review-subagent working-tree pollution — Action Tracker #8 (GitHub #36) — **top v0.4.0 priority**
+- [ ] `check-branch-literals.sh` regex tighten — Action Tracker #7 (GitHub #29) — v0.4.0 drift cluster
 
 ## v0.2.0 — Pipeline hardening (PRs #21–#26)
 
@@ -76,7 +130,7 @@ pipeline-run's Gates 1–4 (including the retro gate added in #8/PR #24) are doc
 
 ### Open Items
 
-- [ ] Consolidate pipeline-run gates into `scripts/pipeline-gates.sh` — Action Tracker #6 (GitHub #28)
+- [x] Consolidate pipeline-run gates into `scripts/pipeline-gates.sh` — Action Tracker #6 (GitHub #28) — resolved in v0.3.0 (PR #32)
 - [ ] Tighten `check-branch-literals.sh` regex against backtick prose — Action Tracker #7 (GitHub #29)
 
 **→ Forward**: planned in strategy session [2026-06-04-v0-2-end](docs/strategy-sessions/2026-06-04-v0-2-end.md) → **v0.3.0 "Executable gates + CI"** (Path 1; #28 is the P1 anchor). Established [ADR-0001](docs/adr/0001-executable-quality-gates.md). #29 deferred to v0.4.0 drift cluster.
