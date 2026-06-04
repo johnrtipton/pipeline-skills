@@ -13,7 +13,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 
 DIR="${1:-templates}"
-command -v python3 >/dev/null || { echo "NOTE: python3 not on PATH — cannot validate; skipping"; exit 0; }
+command -v python3 >/dev/null || { echo "✗ python3 not on PATH — cannot validate templates"; exit 2; }
 
 python3 - "$DIR" <<'PY'
 import json, sys, glob, os
@@ -34,6 +34,11 @@ for f in files:
             d = json.load(fh)
     except (json.JSONDecodeError, OSError) as e:
         print(f"✗ {f} — does not parse: {e}")
+        fail = True
+        continue
+
+    if not isinstance(d, dict):
+        print(f"✗ {f} — top-level JSON is {type(d).__name__}, expected an object")
         fail = True
         continue
 
