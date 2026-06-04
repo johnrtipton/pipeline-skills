@@ -206,7 +206,7 @@ for each prior_stage (1 to current_stage - 1):
 |-----------|-------------------|
 | Commit & PR | `pr_number` and `pr_url` set in state file |
 | Code Review | PR has a review comment (check `gh pr view $PR --json comments`) |
-| Retrospective | PR has a retro comment (check `gh pr view $PR --json comments`) |
+| Retrospective | PR has a retro comment (check `gh pr view $PR --json comments,reviews`) — **now enforced programmatically by Gate 4 below** |
 | Merge PR | PR state is `MERGED` (check `gh pr view $PR --json state`) |
 
 If artifact verification fails: mark the stage back to `pending` and re-run it.
@@ -343,6 +343,33 @@ if echo "$TASK" | grep -iqE 'pollution|leak|flak|test isolation'; then
     done
 fi
 ```
+
+### Gate 4: Retrospective artifact gate (#8)
+
+The Gate Check (Integrity Audit) table lists "Retrospective | PR has a retro
+comment" as a **soft** check — the executor can drop the read under context
+pressure and mark the task done with no retro, which then trips a
+`RETRO_GATE_VIOLATION` later in `/pipeline-retro`. Promote it to a **hard**
+gate, mirroring pipeline-ship's pre-merge retro gate: the task is NOT complete
+until a retrospective artifact exists on the PR. Run at the END of the run,
+after the Retrospective stage, before declaring the task done:
+
+```bash
+# Run after the Retrospective stage, before marking the task complete:
+PR=$(jq -r '.pr_number // empty' .pipeline-state/<branch>.json)
+if [ -n "$PR" ]; then
+    # A retro posted via `gh pr comment` lands in .comments[]; a review-style
+    # retro lands in .reviews[]. Check BOTH or the gate false-fails every run.
+    RETRO=$(gh pr view "$PR" --json comments,reviews \
+        -q '[.comments[].body, .reviews[].body] | join("\n")' \
+        | grep -ic 'retrospective\|RETRO_COMPLETE\|quality:')
+    [ "$RETRO" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Retrospective artifact. Run the Retrospective stage before completing the task."; exit 1; }
+fi
+```
+
+This is the per-PR companion to `/pipeline-retro`'s milestone-level gate: Gate 4
+guarantees each PR carries its own retro artifact, so the milestone retro's
+Stage 2 always finds a valid input source instead of backfilling by hand.
 
 ### Why programmatic, not just imperative
 
