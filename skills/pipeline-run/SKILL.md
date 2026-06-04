@@ -266,8 +266,12 @@ EXPECTED_BRANCH="<branch_name from the active state file>"
 git checkout "$EXPECTED_BRANCH" 2>/dev/null
 if [ -n "$(git status --porcelain)" ]; then
     echo "WARN: working tree dirty after subagent — restoring to HEAD"
-    git restore --staged --worktree .
+    git restore --staged --worktree .           # tracked files (reverted/staged)
+    git clean -fd                               # untracked files/dirs a subagent left (#40)
+                                                # NOTE: no -x, so .gitignore'd files
+                                                # (.env, .pipeline-state/, scratch/) survive
 fi
+[ -z "$(git status --porcelain)" ] || { echo "ERROR: tree still dirty after restore — inspect manually"; exit 1; }
 [ "$(git rev-parse --abbrev-ref HEAD)" = "$EXPECTED_BRANCH" ] || { echo "ERROR: HEAD is not $EXPECTED_BRANCH"; exit 1; }
 ```
 
