@@ -361,6 +361,21 @@ If the project has a component gallery or auto-discovery system:
 - Update discovery tests if they hardcode expected component lists
 - Verify the gallery renders new components correctly (if a `--dry-run` flag exists, use it)
 
+#### 4.5. Enumerated-unit inventories (commonly missed — applies even for DOCS_ONLY)
+
+If this change **adds, renames, or removes a user-facing unit that is enumerated somewhere else** — a skill, a CLI subcommand, a slash command, a plugin, a make target, a public API in a "supported X" list — then every inventory/index surface that lists its *siblings* also needs updating. These surfaces are the single most commonly-missed documentation update, because the new unit works immediately (it's auto-discovered by a glob/registry) while the human-facing lists silently go stale.
+
+Find them mechanically: grep the repo for the name of an existing **sibling** unit across non-source files, and update every file that lists it.
+
+```bash
+# Example: a new skill was added — find every place that inventories the siblings
+grep -rIl --exclude-dir=.git "pipeline-drain" . | grep -v '^\./skills/'
+# Typical hits in this repo: README.md (skill table + chain diagram + structure tree),
+#                            CLAUDE.md (Key components), install.sh (completion echo)
+```
+
+A `DOCS_ONLY` classification does **not** exempt this step — adding a skill is itself a docs-only change, yet it must update three separate inventories. If the unit you changed is enumerated in N places, all N must change together or the docs drift one file at a time.
+
 #### 5. CHANGELOG
 
 For `feat:` and `fix:` changes:

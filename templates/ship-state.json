@@ -72,6 +72,7 @@
         {"action": "add/update docstrings for new/modified public APIs", "done": false},
         {"action": "update CHANGELOG.md if one exists", "done": false},
         {"action": "update any affected documentation files", "done": false},
+        {"action": "if this change adds/renames/removes an enumerated unit (skill, CLI/slash command, plugin, make target, item in a 'supported X' list), update EVERY inventory/index doc that lists its siblings — grep a sibling's name across non-source files to find them; DOCS_ONLY does not exempt this", "done": false},
         {"action": "output DOCS_UPDATED or DOCS_SKIPPED", "done": false, "mandatory": true}
       ]
     },
