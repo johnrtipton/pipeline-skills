@@ -12,6 +12,8 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 | **P2** | pre-drain symbol staleness check | `pipeline-next`/`pipeline-drain` should verify cited symbols exist in the codebase before queuing an issue (#7) | v0.2.0 |
 | **P2** | leave pre-existing lint untouched in scoped PRs | Canonicalize the rule that scoped PRs do not fix unrelated pre-existing lint (#5) | v0.2.0 |
 | **P3** | automate PR placeholder substitution in docs commits | Automate `PR #TBD` placeholder substitution in docs commits so merged PRs get their real number (#6) | v0.2.0 |
+| **P1** | mandate three-dot diff in pipeline-ship review | pipeline-ship Inventory/Self-Review/Stage-7 must use `git diff origin/<base>...HEAD` to avoid the behind-base phantom-deletion trap (#17) | v0.2.0 |
+| **P2** | guard against reintroduced branch literals | Add a check that no skill or `pipeline.py` execution path reintroduces a hard-coded `origin/main` / `master` / `else "main"` literal (#18) | v0.2.0 |
 
 ## Milestones
 
@@ -34,6 +36,12 @@ Canonicalize, in `skills/pipeline-shared/SKILL.md`, that a scoped PR does not fi
 
 **automate PR placeholder substitution in docs commits**
 Add tooling so a docs commit written with a `PR #TBD` placeholder gets the real PR number substituted after creation. Tracks issue (#6).
+
+**mandate three-dot diff in pipeline-ship review**
+Update `skills/pipeline-ship/SKILL.md` so Stage 1 (Inventory), Stage 3 (Self-Review), and the Stage 7 reviewer mandate `git diff origin/<base>...HEAD` (three-dot), with an explicit "behind-base phantom-deletion trap" warning. Tracks issue (#17). Acceptance: the skill never instructs a two-dot review diff; the trap is documented.
+
+**guard against reintroduced branch literals**
+Add a lightweight check (CI grep or documented self-test) that fails when any `skills/*/SKILL.md` execution path or `pipeline.py` reintroduces a hard-coded `origin/main` / `master` / `else "main"` default-branch literal outside the documented resolution chain. Tracks issue (#18).
 
 ## Completed
 
