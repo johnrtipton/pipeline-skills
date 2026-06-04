@@ -6,27 +6,16 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
-| **P1** | runnable pipeline gates script | Extract pipeline-run Gates 1-4 + the retro gate into `scripts/pipeline-gates.sh`, removing the dangling canonical reference (#28) | v0.3.0 |
-| **P1** | template structure validator | A `make` target that validates `templates/*.json` parse and have the required per-type stage shape (the pipeline-init verify step, as a committed check) | v0.3.0 |
-| **P1** | CI workflow running the gates | GitHub Actions runs `make check` + the gates + template validation on every PR, so enforcement stops being manual | v0.3.0 |
 
-_Chosen via strategy session [2026-06-04-v0-2-end](docs/strategy-sessions/2026-06-04-v0-2-end.md) (Path 1 — Runnable gates first). See [ADR-0001](docs/adr/0001-executable-quality-gates.md)._
+_No active tasks — v0.3.0 shipped (PRs #32–#34). Next milestone: v0.4.0 "Drift guards" (see `## Future`); run `/pipeline-strategy` to promote it._
 
 ## Milestones
 
-### Milestone: v0.3.0 — Executable gates + CI
-
-**runnable pipeline gates script**
-Extract pipeline-run's MANDATORY Post-Commit Programmatic Gates (Gate 1 changelog-boundary, Gate 2 docs-only, Gate 3 3-clean-runs, Gate 4 retro artifact) plus the pipeline-ship pre-merge gate into `scripts/pipeline-gates.sh` — one shell function per gate, parameterized by the detected default branch and test command. Update the skills to reference the functions instead of inlining bash. Closes the dangling reference flagged by the #7 staleness check. Tracks issue (#28). Acceptance: `scripts/pipeline-gates.sh` exists with one function per gate; pipeline-run/pipeline-ship reference it.
-
-**template structure validator**
-Add a `make validate-templates` target (and `scripts/validate-templates.sh`) that checks every `templates/*.json` parses and has `pipeline_type` + `stages` keyed `"1".."N"` in order, each with `name`/`status`/`verdict`/`checklist` — the verify step `pipeline-init` describes, committed as a runnable check. Acceptance: the target passes on the current templates and fails on a malformed one.
-
-**CI workflow running the gates**
-Add `.github/workflows/ci.yml` that runs `make check`, the gates script, and template validation on every PR and push, so the quality machinery is enforced automatically rather than via a manual `make check`. Acceptance: CI is green on a conforming PR and red when a branch literal or malformed template is introduced.
-
+_No active milestone. See `## Completed` for v0.3.0 and `## Future` for the v0.4.0 backlog._
 
 ## Completed
+
+- v0.3.0 — Executable gates + CI: runnable `scripts/pipeline-gates.sh` (#28, PR #32); template structure validator + `make validate-templates` (PR #33); GitHub Actions CI enforcing the gates (PR #34). Established ADR-0001. ✅ Shipped
 
 - v0.2.0 — Pipeline hardening: branch-agnostic `run_auto` + literal guard (#11, #18, PR #21); three-dot diff mandate in pipeline-ship (#17, PR #22); lint scope-discipline + per-task coverage expectation (#5, #9, PR #23); hard programmatic retro-stage gate (#8, PR #24); pre-drain symbol staleness check (#7, PR #25); PR `#TBD` placeholder substitution (#6, PR #26). ✅ Shipped
 - v0.1.0 — Branch-agnostic pipeline family + vendored, hardened `pipeline-init` (PR #10). ✅ Shipped
