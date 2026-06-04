@@ -6,45 +6,16 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
-| **P1** | run_auto branch-agnostic auto-mode naming | `pipeline.py` `run_auto` still hard-codes `else "main"` for auto-mode branch naming while every skill now resolves the default branch dynamically (#11) | v0.2.0 |
-| **P1** | retro-stage programmatic enforcement gate | Harden `pipeline-run` retro-stage enforcement with a programmatic gate, mirroring the pipeline-ship pre-merge gate (#8) | v0.2.0 |
-| **P2** | per-task test-coverage expectation at selection | `pipeline-next` should surface a per-task test-coverage expectation at selection time so coverage isn't an afterthought (#9) | v0.2.0 |
-| **P2** | pre-drain symbol staleness check | `pipeline-next`/`pipeline-drain` should verify cited symbols exist in the codebase before queuing an issue (#7) | v0.2.0 |
-| **P2** | leave pre-existing lint untouched in scoped PRs | Canonicalize the rule that scoped PRs do not fix unrelated pre-existing lint (#5) | v0.2.0 |
-| **P3** | automate PR placeholder substitution in docs commits | Automate `PR #TBD` placeholder substitution in docs commits so merged PRs get their real number (#6) | v0.2.0 |
-| **P1** | mandate three-dot diff in pipeline-ship review | pipeline-ship Inventory/Self-Review/Stage-7 must use `git diff origin/<base>...HEAD` to avoid the behind-base phantom-deletion trap (#17) | v0.2.0 |
-| **P2** | guard against reintroduced branch literals | Add a check that no skill or `pipeline.py` execution path reintroduces a hard-coded `origin/main` / `master` / `else "main"` literal (#18) | v0.2.0 |
+
+_No active tasks — v0.2.0 shipped (PRs #21–#26). Next milestone TBD; run `/pipeline-strategy` to plan v0.3.0._
 
 ## Milestones
 
-### Milestone: v0.2.0 — Pipeline hardening
-
-**run_auto branch-agnostic auto-mode naming**
-Make `pipeline.py` `run_auto` resolve the repo default branch the same way the skills do (pipeline-config `default_branch` → `origin/HEAD` → `git remote show origin` → fallback) instead of the literal `else "main"` at `pipeline.py:798`. Tracks issue (#11). Acceptance: no `"main"` literal remains in `run_auto`; auto-mode branch naming uses the detected branch.
-
-**retro-stage programmatic enforcement gate**
-Add a programmatic gate to `pipeline-run` that physically blocks completion until the retro stage has produced its artifact, mirroring the pipeline-ship pre-merge gate in `skills/pipeline-ship/SKILL.md`. Tracks issue (#8). Acceptance: a run cannot report complete without a retro artifact on the PR.
-
-**per-task test-coverage expectation at selection**
-Have `skills/pipeline-next/SKILL.md` surface an expected test-coverage note for the selected task at selection time, so the implementing agent knows the coverage bar before Stage 1. Tracks issue (#9).
-
-**pre-drain symbol staleness check**
-Before `pipeline-drain` queues an issue, verify every code symbol the issue cites still exists in the codebase (a pre-drain staleness check shared with `pipeline-next`). Tracks issue (#7). Acceptance: issues citing removed symbols are flagged, not silently queued.
-
-**leave pre-existing lint untouched in scoped PRs**
-Canonicalize, in `skills/pipeline-shared/SKILL.md`, that a scoped PR does not fix unrelated pre-existing lint warnings — keep the diff scoped. Tracks issue (#5).
-
-**automate PR placeholder substitution in docs commits**
-Add tooling so a docs commit written with a `PR #TBD` placeholder gets the real PR number substituted after creation. Tracks issue (#6).
-
-**mandate three-dot diff in pipeline-ship review**
-Update `skills/pipeline-ship/SKILL.md` so Stage 1 (Inventory), Stage 3 (Self-Review), and the Stage 7 reviewer mandate `git diff origin/<base>...HEAD` (three-dot), with an explicit "behind-base phantom-deletion trap" warning. Tracks issue (#17). Acceptance: the skill never instructs a two-dot review diff; the trap is documented.
-
-**guard against reintroduced branch literals**
-Add a lightweight check (CI grep or documented self-test) that fails when any `skills/*/SKILL.md` execution path or `pipeline.py` reintroduces a hard-coded `origin/main` / `master` / `else "main"` default-branch literal outside the documented resolution chain. Tracks issue (#18).
+_No active milestone. See `## Completed` for v0.2.0._
 
 ## Completed
 
+- v0.2.0 — Pipeline hardening: branch-agnostic `run_auto` + literal guard (#11, #18, PR #21); three-dot diff mandate in pipeline-ship (#17, PR #22); lint scope-discipline + per-task coverage expectation (#5, #9, PR #23); hard programmatic retro-stage gate (#8, PR #24); pre-drain symbol staleness check (#7, PR #25); PR `#TBD` placeholder substitution (#6, PR #26). ✅ Shipped
 - v0.1.0 — Branch-agnostic pipeline family + vendored, hardened `pipeline-init` (PR #10). ✅ Shipped
 - v0.1.0 — Documented `/pipeline-init` across README, CLAUDE.md, and install.sh (PRs #12, #13, #14). ✅ Shipped
 - v0.1.0 — Stage-5 enumerated-unit inventory gate in pipeline-shared + all four templates (PR #15). ✅ Shipped
