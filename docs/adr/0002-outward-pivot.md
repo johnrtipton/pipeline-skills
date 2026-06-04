@@ -1,6 +1,6 @@
 # ADR-0002: Outward pivot — prove and package the family, not just harden it
 
-**Status**: Proposed
+**Status**: Accepted — in force since v0.5.0 (PRs #46–#49); continued in v0.6.0
 **Date**: 2026-06-04
 **Source**: Strategy session [2026-06-04-v0-4-end](../strategy-sessions/2026-06-04-v0-4-end.md) (Path 2)
 

@@ -1,6 +1,6 @@
 # ADR-0001: Quality gates must be executable, not prose
 
-**Status**: Proposed
+**Status**: Accepted — implemented in v0.3.0 (PRs #32–#34)
 **Date**: 2026-06-04
 **Source**: Strategy session [2026-06-04-v0-2-end](../strategy-sessions/2026-06-04-v0-2-end.md) (Path 1)
 
