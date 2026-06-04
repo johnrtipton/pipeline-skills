@@ -13,8 +13,9 @@ issue or be explicitly closed with a reason.
 | 4 | Stage-5 enumerated-unit inventory gate (README/CLAUDE.md/install.sh rot) | PRs #12–#15 | — | Closed | Resolved in PR #15 — `pipeline-shared` step 4.5 + feature/bugfix/refactor/ship templates |
 | 5 | Self-initialize the pipeline-skill repo (no ROADMAP/RETRO/config existed) | Retro v0.1.0 | — | Closed | Resolved in PR #16 — ROADMAP, RETRO, CHANGELOG, pipeline-config block |
 | 6 | Consolidate pipeline-run inline gates into `scripts/pipeline-gates.sh` (dangling canonical reference) | Retro v0.2.0 / PR #24 | #28 | Closed | Resolved in PR #32 (v0.3.0) — executable gate functions |
-| 7 | `check-branch-literals.sh` diff/rev-parse regex can false-positive on backtick-wrapped prose | Retro v0.2.0 / PR #21 | #29 | Open | v0.4.0 drift cluster |
-| 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Open | **Top v0.4.0 priority — broke a downstream build.** Fix: review subagents restore HEAD on exit (template prompt) + executor re-verifies worktree==HEAD before build/scp |
+| 7 | `check-branch-literals.sh` diff/rev-parse regex can false-positive on backtick-wrapped prose | Retro v0.2.0 / PR #21 | #29 | Closed | Resolved in PR #41 (v0.4.0) — strips inline-code spans before matching |
+| 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Closed | Resolved in PR #39 (v0.4.0) — template restore-HEAD step + pipeline-run worktree-restore reflex |
+| 9 | Worktree-restore reflex doesn't remove untracked files left by a subagent | Retro v0.4.0 / PR #39 | #40 | Open | Low severity — observed case was a reverted tracked file; add `git clean -fd` guard or re-check |
 
 <!-- Milestone retro entry template:
 ## <milestone> — <Title> (PRs #NN–#MM)
@@ -25,6 +26,58 @@ issue or be explicitly closed with a reason.
 ### Review Stats
 ### Open Items
 -->
+
+## v0.4.0 — Drift guards (PRs #39, #41)
+
+**Date**: 2026-06-04
+**Scope**: Promoted (PR #38) and shipped the two concrete drift issues: review subagents now restore HEAD on exit + an executor worktree-restore reflex (#36), and the branch-literal guard no longer false-positives on backtick prose (#29).
+**Tests at close**: n/a — CI (`make check` + script syntax + parse) green on every PR.
+
+### What We Learned
+
+**1. The subagent-pollution fix was validated by the mechanism it fixes.**
+#36 (a cross-project bug from djustlive that broke a base-image build across 5 PRs) was fixed by making Code Review subagents restore HEAD. The proof it works: PRs #39 and #41 each spawned a Code Review subagent under the new prompt, and both started and ended on the feature branch with a clean tree — the executor verified `worktree==HEAD` after each. Dogfooding the dogfooder: a "subagents misbehave" fix is most convincingly validated by spawning subagents under it and confirming they behave.
+
+**Action taken**: closed — Action Tracker #8 resolved in PR #39 (template restore step + pipeline-run reflex).
+
+**2. The branch-literal guard was tightened without opening a false-negative.**
+#29's fix strips inline-code spans before matching, so prose like `` `git diff origin/main` `` is ignored while real fenced-block commands are still caught. The Code Review confirmed (on bash 3.2/BSD) there is no reachable false-negative — the dangerous direction for a guard.
+
+**Action taken**: closed — Action Tracker #7 resolved in PR #41.
+
+**3. The #36 fix left a narrower gap; the capture channel caught it.**
+PR #39's review noted that `git restore --staged --worktree .` only touches tracked files — a subagent leaving NEW untracked files would still pass them into a build. Low severity (the observed djustlive failure was a reverted tracked file), but real.
+
+**Action taken**: Open — tracked in Action Tracker #9 (GitHub #40).
+
+### Insights
+
+- **Dogfooding-the-dogfooder is uniquely available here**: the repo's own pipeline uses Code Review subagents, so a fix to subagent behavior is exercised the moment the next PR's review runs. The validation is free and direct.
+- **A full re-serialize obscures a small change**: `json.dump(indent=2)` on the templates in PR #39 bloated the diff to 1303/298 for what was a one-line-per-prompt addition. Prefer string-level edits to template prompts to keep diffs reviewable.
+- **Two clean milestones running (v0.3.0, v0.4.0) with 0 retro-gate violations** — the Gate 4 + per-PR-retro habit is now reliable, not luck.
+- **Cross-project bug-flow-back works end to end**: #36 originated in djustlive, was filed against this repo mid-v0.3.0, promoted in PR #38, and shipped in v0.4.0 — one milestone from report to fix.
+
+### Review Stats
+
+| Metric | #39 | #41 | Total |
+|--------|-----|-----|-------|
+| Subagent code reviews | 1 | 1 | 2 |
+| Review verdict | APPROVE | APPROVE | — |
+| 🔴 Findings | 0 | 0 | 0 |
+| Deferred to issue | 1 (#40) | 0 | 1 |
+| Subagent left clean tree (the #36 check) | yes | yes | 2/2 |
+| CI runs (green) | 1 | 1 | 2 |
+| Tests added | 0 (no suite) | 0 | 0 |
+
+### Process Improvements Applied
+
+**Templates**: Code Review `subagent_prompt` restores HEAD on exit, all four templates (PR #39).
+**Skills**: pipeline-run worktree-restore reflex before build/scp/ship (PR #39).
+**Scripts**: `check-branch-literals.sh` strips inline-code spans before matching (PR #41).
+
+### Open Items
+
+- [ ] Worktree-restore reflex should also clear untracked files — Action Tracker #9 (GitHub #40)
 
 ## v0.3.0 — Executable gates + CI (PRs #32, #33, #34)
 
@@ -76,8 +129,8 @@ This milestone leaned on Code Review subagents (#32, #33). A sibling project (dj
 
 ### Open Items
 
-- [ ] Review-subagent working-tree pollution — Action Tracker #8 (GitHub #36) — **top v0.4.0 priority**
-- [ ] `check-branch-literals.sh` regex tighten — Action Tracker #7 (GitHub #29) — v0.4.0 drift cluster
+- [x] Review-subagent working-tree pollution — Action Tracker #8 (GitHub #36) — resolved in v0.4.0 (PR #39)
+- [x] `check-branch-literals.sh` regex tighten — Action Tracker #7 (GitHub #29) — resolved in v0.4.0 (PR #41)
 
 ## v0.2.0 — Pipeline hardening (PRs #21–#26)
 
