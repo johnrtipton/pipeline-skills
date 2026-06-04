@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   retroactively at each milestone's retrospective commit (v0.5.0 outward pivot).
 
 ### Fixed
+- `detect_default_branch` now resolves a `master`-default repo with no `origin`
+  to `master` (was `main`): adds an `origin/<cand>` existence probe and a
+  current-branch fallback before the `main` literal, reaching parity with the
+  pipeline-init SKILL chain (#45).
 - Worktree-restore reflex now also removes untracked files a subagent leaves
   (`git clean -fd`, preserving `.gitignore`'d files) and re-verifies the tree is
   clean — closes the tracked-files-only gap in the #36 fix (#40).
