@@ -246,6 +246,35 @@ The check is <50 ms — run it as a reflex before every pipeline commit.
 This is the per-commit companion to the one-time **State-File Gate**
 below (which fires at branch creation / first commit / PR open).
 
+### Worktree-restore reflex (after any subagent, before any build/scp/ship) (#36)
+
+A read-only subagent (Code Review especially) that runs `git checkout` /
+`git diff origin/<base>...HEAD` to read a PR diff can return with the executor's
+working tree left on the base branch or with files reverted/staged. The executor
+then builds, `scp`s, or ships from a tree that no longer matches the PR's
+committed HEAD — silently shipping stale content. (Observed: djustlive PR #438
+`scp`'d a `build-base-rootfs.sh` that had been reverted to `main`, building the
+wrong base image; recurred across 5 PRs.)
+
+The template Code Review `subagent_prompt` now instructs the subagent to restore
+HEAD on exit (#36). As a backstop, **before any build / scp / deploy / ship step
+that follows a subagent**, the executor re-verifies the tree matches the expected
+commit:
+
+```bash
+EXPECTED_BRANCH="<branch_name from the active state file>"
+git checkout "$EXPECTED_BRANCH" 2>/dev/null
+if [ -n "$(git status --porcelain)" ]; then
+    echo "WARN: working tree dirty after subagent — restoring to HEAD"
+    git restore --staged --worktree .
+fi
+[ "$(git rev-parse --abbrev-ref HEAD)" = "$EXPECTED_BRANCH" ] || { echo "ERROR: HEAD is not $EXPECTED_BRANCH"; exit 1; }
+```
+
+The branch-verify reflex above guards *commits*; this guards *builds/scp/ship
+from the working tree*, which a review subagent can silently dirty. Run both as
+reflexes — they are cheap and catch different failure modes.
+
 ```bash
 # 1. Stage the files you intend to commit FIRST.
 git add <file1> <file2> ...
