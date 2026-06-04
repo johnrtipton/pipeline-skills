@@ -79,6 +79,8 @@ pipeline-run's Gates 1–4 (including the retro gate added in #8/PR #24) are doc
 - [ ] Consolidate pipeline-run gates into `scripts/pipeline-gates.sh` — Action Tracker #6 (GitHub #28)
 - [ ] Tighten `check-branch-literals.sh` regex against backtick prose — Action Tracker #7 (GitHub #29)
 
+**→ Forward**: planned in strategy session [2026-06-04-v0-2-end](docs/strategy-sessions/2026-06-04-v0-2-end.md) → **v0.3.0 "Executable gates + CI"** (Path 1; #28 is the P1 anchor). Established [ADR-0001](docs/adr/0001-executable-quality-gates.md). #29 deferred to v0.4.0 drift cluster.
+
 ## v0.1.0 — Branch-agnostic family + self-bootstrap (PRs #10, #12, #13, #14, #15, #16)
 
 **Date**: 2026-06-04
