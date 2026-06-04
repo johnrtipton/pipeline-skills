@@ -84,8 +84,11 @@ def detect_default_branch(project: str) -> str:
     """Resolve the repo's default branch — mirrors the pipeline-* skills' chain.
 
     Order: CLAUDE.md pipeline-config ``default_branch`` -> ``origin/HEAD``
-    symbolic ref -> ``git remote show origin`` HEAD branch -> ``main`` fallback.
-    Never assume ``main``/``master``; the literal is only the last resort.
+    symbolic ref -> ``git remote show origin`` HEAD branch -> ``origin/<cand>``
+    existence probe -> current branch -> ``main`` fallback. Never assume
+    ``main``/``master``; the literal is only the last resort. The current-branch
+    fallback fixes #45 (a ``master`` repo with no ``origin`` wrongly returned
+    ``main``).
     """
     project_path = Path(project)
 
@@ -119,7 +122,30 @@ def detect_default_branch(project: str) -> str:
     except (subprocess.TimeoutExpired, OSError):
         pass
 
-    # 4. last resort
+    # 4. probe a remote branch in priority order (remote exists but HEAD unset)
+    for cand in ("main", "master", "development"):
+        try:
+            r = subprocess.run(
+                ["git", "-C", project, "rev-parse", "--verify", "--quiet",
+                 f"refs/remotes/origin/{cand}"],
+                capture_output=True, text=True, timeout=10)
+            if r.returncode == 0 and r.stdout.strip():
+                return cand
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    # 5. current branch — last resort for a local/remoteless repo (#45).
+    #    Without this, a master-default repo with no origin wrongly returned "main".
+    try:
+        r = subprocess.run(["git", "-C", project, "rev-parse", "--abbrev-ref", "HEAD"],
+                           capture_output=True, text=True, timeout=10)
+        b = r.stdout.strip()
+        if r.returncode == 0 and b and b != "HEAD":   # "HEAD" == detached
+            return b
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
+    # 6. absolute fallback
     return "main"
 
 
