@@ -6,12 +6,18 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
-
-_No active tasks — v0.3.0 shipped (PRs #32–#34). Next milestone: v0.4.0 "Drift guards" (see `## Future`); run `/pipeline-strategy` to promote it._
+| **P1** | review-subagent worktree restore | Code Review subagents leave the executor's working tree on `main`, so a following build/scp ships stale files — broke a base-image build in djustlive across 5 PRs (#36) | v0.4.0 |
+| **P2** | tighten check-branch-literals regex | The `check-branch-literals.sh` diff/rev-parse pattern can false-positive on backtick-wrapped prose like `git diff origin/main` (#29) | v0.4.0 |
 
 ## Milestones
 
-_No active milestone. See `## Completed` for v0.3.0 and `## Future` for the v0.4.0 backlog._
+### Milestone: v0.4.0 — Drift guards
+
+**review-subagent worktree restore**
+A Code Review (or any read-only) subagent that runs `git checkout`/`git diff origin/main...HEAD` to read a PR diff must restore the executor's working tree on exit — `git checkout <original-branch>` (or `git restore --source=HEAD --staged --worktree`) — leaving the tree exactly as found. Add this to the Code Review stage `subagent_prompt` in the feature/bugfix/refactor/ship templates, and add an executor reflex to `skills/pipeline-run/SKILL.md`: re-verify `git status --porcelain` is clean and `git rev-parse HEAD` matches the state file's expected commit before any build/scp/ship that follows a subagent. Tracks issue (#36). Acceptance: the template prompts include the restore step; pipeline-run documents the pre-build worktree==HEAD reflex.
+
+**tighten check-branch-literals regex**
+Tighten the `git (diff|rev-parse)...origin/(main|master)` alternative in `scripts/check-branch-literals.sh` so a backtick-wrapped inline-code prose example does not false-positive — anchor on actual command context / fenced bash, not inline code. Tracks issue (#29). Acceptance: a doc line containing inline `git diff origin/main` does not trip the guard; real command-line literals still do.
 
 ## Completed
 
@@ -25,7 +31,7 @@ _No active milestone. See `## Completed` for v0.3.0 and `## Future` for the v0.4
 
 ## Future
 
-- **v0.4.0 — Drift guards** (deferred from the 2026-06-04 strategy session, Path 2 / Cluster C; easier once the v0.3.0 CI harness exists to hang it on): a SKILL.md bash-snippet self-test harness for branch-resolution-chain drift; a flexion-plugin sync check (published copy vs canonical `skills/`); and tightening `check-branch-literals.sh` against backtick prose (#29, Action Tracker #7). Promote to the Priority Matrix when v0.3.0 closes.
+- **Larger drift guards** (Cluster C remainder, not yet broken into issues — promote via a future `/pipeline-strategy`): a SKILL.md bash-snippet self-test harness for branch-resolution-chain drift, and a flexion-plugin sync check (published copy vs canonical `skills/`). (The two concrete drift issues, #36 and #29, were promoted into the v0.4.0 milestone above.)
 
 ## Contributing
 
