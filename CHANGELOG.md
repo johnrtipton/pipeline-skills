@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `/pipeline-cycle` — the outer-loop orchestrator that chains
+  `strategy → run --all → retro` across milestones to a clean terminal state.
+  Semi-autonomous by default (pauses at each strategy decision per ADR-0003);
+  `--auto` for full hands-off. Plus `scripts/terminal-state.sh` + `make
+  terminal-state` (the stop condition: 0 issues + 0 active tasks + no Proposed
+  ADR + CI green). Indexed in README/CLAUDE.md/install.sh (v0.7.0, #58 plan).
+
+### Added
 - `docs/adoption.md` — clone-to-first-PR adoption guide for using the family in
   an external repo, linked from the README (v0.5.0 outward pivot).
 - `docs/releasing.md` — release process; cut the first four tags (`v0.1.0`–`v0.4.0`)

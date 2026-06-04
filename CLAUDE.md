@@ -32,6 +32,7 @@ extracts verdict from output → updates state file → repeats for next stage
 - `skills/pipeline-run/SKILL.md` — Stage executor: reads state file, spawns agents per stage, updates state
 - `skills/pipeline-ship/SKILL.md` — Ships existing working tree changes through quality gates to merged PR
 - `skills/pipeline-strategy/SKILL.md` — Plans the next milestone via state-file-driven 8-stage session: survey → brainstorm → triage → cluster → present-paths (≥2) → recommend → decide → capture (ROADMAP/ADR/next-step)
+- `skills/pipeline-cycle/SKILL.md` — The outer loop: chains strategy → run --all → retro across milestones to a clean terminal state. Semi-autonomous by default (pauses at each strategy decision per ADR-0003); `--auto` for full hands-off. The orchestrator the human used to be
 
 **State files** live in the target project at `.pipeline-state/<branch>.json` (gitignored). They track per-stage status, checklists with mandatory flags, verdicts, PR info, and enable resume after interruption.
 
