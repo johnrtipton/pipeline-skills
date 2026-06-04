@@ -121,6 +121,11 @@ format (bold issue number + title, em-dash, description).
 ### 7. Commit the ROADMAP update
 
 ```bash
+# Resolve the repo's default branch (pipeline-config → origin/HEAD → remote → fallback). Never assume main/master.
+BASE=$(sed -n 's/^- *default_branch: *//p' CLAUDE.md 2>/dev/null | awk 'NR==1{print $1}')
+[ -z "$BASE" ] && BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+[ -z "$BASE" ] && BASE=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+[ -z "$BASE" ] && BASE=main
 git add ROADMAP.md
 git commit -m "$(cat <<'EOF'
 docs(roadmap): add N open issues to vX.Y.Z milestone
@@ -128,7 +133,7 @@ docs(roadmap): add N open issues to vX.Y.Z milestone
 Audit-bypass-reason: docs-only ROADMAP update via pipeline-drain skill (no retro needed)
 EOF
 )"
-git push origin main
+git push origin "$BASE"
 ```
 
 ### 8. Run the pipeline

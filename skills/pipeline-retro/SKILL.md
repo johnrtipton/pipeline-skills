@@ -282,11 +282,16 @@ Output `PREVIOUS_MILESTONES_UPDATED <count>`.
 ### Stage 6 — Commit
 
 ```bash
+# Resolve the repo's default branch (pipeline-config → origin/HEAD → remote → fallback). Never assume main/master.
+BASE=$(sed -n 's/^- *default_branch: *//p' CLAUDE.md 2>/dev/null | awk 'NR==1{print $1}')
+[ -z "$BASE" ] && BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+[ -z "$BASE" ] && BASE=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+[ -z "$BASE" ] && BASE=main
 git add RETRO.md
 # plus any CLAUDE.md / PR-checklist / skill files updated as `diff` or `skill_update` actions
 git commit -m "docs(retro): milestone vX.Y.Z + action tracker update"
 git log -1 --oneline   # Action #122 — verify commit landed with expected message
-git push origin main
+git push origin "$BASE"
 ```
 
 Output `RETRO_COMPLETE`.
