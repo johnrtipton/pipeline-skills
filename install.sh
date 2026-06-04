@@ -28,5 +28,5 @@ ls "${SCRIPT_DIR}/profiles/"*.json 2>/dev/null | while read f; do
 done
 
 echo ""
-echo "Done. Skills available: /pipeline-next, /pipeline-run, /pipeline-ship, /pipeline-dev, /pipeline-retro, /pipeline-roadmap-audit, /pipeline-strategy, /pipeline-drain, pipeline-shared (reference)"
+echo "Done. Skills available: /pipeline-init, /pipeline-next, /pipeline-run, /pipeline-ship, /pipeline-dev, /pipeline-retro, /pipeline-roadmap-audit, /pipeline-strategy, /pipeline-drain, pipeline-shared (reference)"
 echo "Profiles: generic, django (auto-detected or set pipeline_profile in CLAUDE.md)"
