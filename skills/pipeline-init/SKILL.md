@@ -648,38 +648,29 @@ Configuration-Gathering and Environment-Check read `default_branch` /
 `pr_target_branch` here (and from the template's `pr_target_branch`) and resolve
 `origin/<default_branch>`.
 
-### 6b. Default-branch wiring — honest WIRED vs REQUIRES-SKILL-CHANGE
+### 6b. Default-branch wiring — fully WIRED
 
-Be explicit in the plan about how far the config reaches:
+The whole family is branch-agnostic (as of 2026-06-04): **no skill has a
+hard-coded `origin/main` / `main` / `master` in any execution path.** Each one
+resolves the branch the same way — pipeline-config `default_branch` →
+`git symbolic-ref refs/remotes/origin/HEAD` → `git remote show origin` → fallback
+— then operates on `origin/$BASE`:
 
-- **WIRED (no skill edit needed):** pipeline-shared's Environment-Check resolves
-  the target via `pr_target_branch → default_branch → try main/master/development`.
-  Writing the detected branch into `.pipeline-templates/*` (`pr_target_branch` /
-  `default_branch`) and the CLAUDE.md block routes these skills to
-  `origin/<detected>` with no skill change. Covers pipeline-shared and (via it)
-  most of pipeline-run. **pipeline-ship** resolves the PR target via config
-  (`pr_target_branch`/`default_branch`), so `master`/`main` work — BUT its
-  on-branch detection (Step 0.4) only special-cases `main`/`master`; on a
-  `development`-default repo confirm the working branch is not literally
-  `development`.
-- **REQUIRES-SKILL-CHANGE (init CANNOT fix from inside the host repo):** several
-  skills contain a **literal `origin/main` / `main`** that does NOT consult config
-  — on a non-`main` repo these target a nonexistent branch. Init must EMIT this
-  warning verbatim so the user knows the residual gap:
+- **pipeline-shared / pipeline-run / pipeline-retro / pipeline-drain /
+  pipeline-ship** resolve `$BASE` and use `origin/$BASE` for branch base,
+  unpushed-commit checks, pushes, and stacked-PR detection.
+- **pipeline-dev**'s stage-8 example uses the detected default branch.
+- **pipeline-strategy** contains no branch literal.
 
-  ```
-  ⚠ REQUIRES-SKILL-CHANGE — these skills have literal `origin/main`/`main`
-    that ignores the detected branch (<DEFAULT_BRANCH>). Edit them once in
-    the pipeline-skill skills/ dir to read {default_branch} from CLAUDE.md/template:
-      • pipeline-run     (git checkout -B {branch} origin/main; git log origin/main..main)
-      • pipeline-retro   (git push origin main, Stage 6)
-      • pipeline-drain   (git push origin main; --all to main)
-      • pipeline-strategy (assumes `main`)
-    The fix is "use the detected branch," whatever it is — do NOT special-case master.
-  ```
+So init makes a non-`main` repo work by writing the detected branch into
+`.pipeline-templates/*` (`pr_target_branch` / `default_branch`) and the CLAUDE.md
+pipeline-config block — and **no skill edit is needed**. The verification step
+(`git rev-parse --verify origin/<detected>`) confirms the resolved branch exists.
 
-  Init WIRES everything it can via config and emits this one-line warning. It does
-  not edit the pipeline-skill source.
+> If you are running an OLDER copy of the pipeline-skill repo that predates the
+> 2026-06-04 branch-agnostic fix, some skills may still carry a literal
+> `origin/main`; pull the latest pipeline-skill before relying on full
+> branch-independence.
 
 ### 6c. Optional: gates stub (`--with-gates`) and ship template (`--with-ship`)
 
@@ -836,10 +827,12 @@ rejects). Greps are a cheap pre-check only.
 
 ### Unresolved ambiguities (surface these in the report)
 
-1. **Literal `origin/main` in four skills** — WIRED via config for shared/ship
-   (ship's PR target only; its on-branch detection still special-cases
-   main/master); REQUIRES-SKILL-CHANGE for pipeline-run/retro/drain/strategy (see
-   §6b). Init wires what it can and warns about the rest.
+1. **Default branch** — fully WIRED (since 2026-06-04): no skill hard-codes
+   `origin/main`; all resolve from pipeline-config → `origin/HEAD` →
+   `git remote show origin` → fallback (see §6b). Init writes the detected branch
+   into the templates + CLAUDE.md config; no skill edit is needed. (Only caveat:
+   an OLD pipeline-skill checkout predating the fix may still carry literals —
+   pull latest.)
 2. **Version scheme** — no tags ⇒ init invents `v0.1.0` (chosen, not derivable).
    Use `--base-version` (must be `vN.N.N`, no suffix).
 3. **CHANGELOG format/applicability** — unspecified by the skills; init defaults
