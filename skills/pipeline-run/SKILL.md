@@ -386,9 +386,23 @@ called from the executor's stage-completion handler. The
 keep the imperative text for human-readable signaling, but the executor
 MUST also run the programmatic gate at the corresponding stage boundary.
 
-For projects that don't have a `scripts/pipeline-gates.sh` yet, the
-executor inlines the bash one-liners above immediately after the
-relevant `git commit && git log -1 --oneline` post-commit verification.
+**This repo ships that script** (ADR-0001 — gates are executable, not prose).
+`scripts/pipeline-gates.sh` provides one function per gate, usable as a library
+(`source` it) or via CLI dispatch:
+
+```bash
+bash scripts/pipeline-gates.sh changelog-boundary HEAD     # Gate 1 (after the implementation commit)
+bash scripts/pipeline-gates.sh docs-only HEAD              # Gate 2 (after the docs commit)
+bash scripts/pipeline-gates.sh pollution-runs "<test-cmd>" # Gate 3 (pollution-class fixes)
+bash scripts/pipeline-gates.sh retro-artifact <pr>         # Gate 4 (after the Retrospective stage)
+bash scripts/pipeline-gates.sh premerge <pr> <state-file>  # pipeline-ship pre-merge gate
+```
+
+Each prints a one-line verdict and returns non-zero on failure. CI runs them on
+every PR (v0.3.0), so the gates are enforced independent of any executor's
+attention. For a repo that has not yet adopted the script, the executor inlines
+the bash one-liners above immediately after the relevant
+`git commit && git log -1 --oneline` post-commit verification.
 
 ## MANDATORY Post-Commit Verification (Action #122)
 
