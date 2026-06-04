@@ -55,6 +55,12 @@ For each matching task, check:
 - `gh pr list --state merged --head <branch>` finds a merged PR → done
 - `.pipeline-state/<branch>.json` exists without `completed_at` → **resume this one**
 
+If the selected task came from a GitHub issue, also run the **staleness check**
+(#7) before committing to it — verify the symbols/paths it cites still exist:
+```bash
+bash scripts/check-issue-symbols.sh <issue-number>   # ⚠ miss → review before selecting
+```
+
 Print status of all matching tasks.
 
 ### 6. Group related tasks (--group mode)
