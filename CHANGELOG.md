@@ -12,6 +12,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   retroactively at each milestone's retrospective commit (v0.5.0 outward pivot).
 
 ### Fixed
+- Worktree-restore reflex now also removes untracked files a subagent leaves
+  (`git clean -fd`, preserving `.gitignore`'d files) and re-verifies the tree is
+  clean — closes the tracked-files-only gap in the #36 fix (#40).
 - `check-branch-literals.sh` no longer false-positives on backtick-wrapped prose
   mentions of `git diff origin/main` etc.: it strips inline-code spans before
   matching, so doc examples are ignored while real fenced-block commands are
