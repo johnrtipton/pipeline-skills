@@ -15,7 +15,8 @@ issue or be explicitly closed with a reason.
 | 6 | Consolidate pipeline-run inline gates into `scripts/pipeline-gates.sh` (dangling canonical reference) | Retro v0.2.0 / PR #24 | #28 | Closed | Resolved in PR #32 (v0.3.0) — executable gate functions |
 | 7 | `check-branch-literals.sh` diff/rev-parse regex can false-positive on backtick-wrapped prose | Retro v0.2.0 / PR #21 | #29 | Closed | Resolved in PR #41 (v0.4.0) — strips inline-code spans before matching |
 | 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Closed | Resolved in PR #39 (v0.4.0) — template restore-HEAD step + pipeline-run worktree-restore reflex |
-| 9 | Worktree-restore reflex doesn't remove untracked files left by a subagent | Retro v0.4.0 / PR #39 | #40 | Open | Low severity — observed case was a reverted tracked file; add `git clean -fd` guard or re-check |
+| 9 | Worktree-restore reflex doesn't remove untracked files left by a subagent | Retro v0.4.0 / PR #39 | #40 | Closed | Resolved in PR #49 (v0.5.0) — `git clean -fd` + re-verify |
+| 10 | `detect_default_branch` returns `main` for a `master`-default repo with no `origin/HEAD` | Retro v0.5.0 / PR #46 | #45 | Open | **Found by the v0.5.0 foreign-repo validation** — branch-agnosticism hole at the harness entry point; v0.6.0 lead |
 
 <!-- Milestone retro entry template:
 ## <milestone> — <Title> (PRs #NN–#MM)
@@ -26,6 +27,57 @@ issue or be explicitly closed with a reason.
 ### Review Stats
 ### Open Items
 -->
+
+## v0.5.0 — Outward pivot (PRs #46, #47, #48, #49)
+
+**Date**: 2026-06-04
+**Scope**: First outward milestone (ADR-0002). Validated the family on a foreign repo, wrote an adoption guide, established a release process + cut the first tags, and closed the #40 untracked-files gap.
+**Tests at close**: n/a — CI green on every PR.
+
+### What We Learned
+
+**1. The outward pivot found a foundational bug on the first probe.**
+Running the family's detection against a deliberately-foreign scratch repo (`master`-default, Node, checkbox ROADMAP) immediately surfaced that `detect_default_branch` returns `main` for a `master` repo with no `origin/HEAD` (#45) — a branch-agnosticism hole at the harness entry point that four inward milestones never hit, because dogfooding only ever ran on this `main`-default repo with an origin. ADR-0002's bet (external use finds what self-use can't) paid on the first try.
+
+**Action taken**: Open — tracked in Action Tracker #10 (GitHub #45).
+
+**2. The repo was not actually consumable; now it is.**
+After four milestones the repo had 0 git tags and referenced a flexion plugin not present — nobody but the author had a supported path in. v0.5.0 added `docs/adoption.md` (clone → first PR) and a release process, and cut the first four tags (`v0.1.0`–`v0.4.0`) at their retro commits.
+
+**Action taken**: closed — adoption quickstart (PR #47) + release process & tags (PR #48).
+
+**3. The capture loop closed across two milestones.**
+PR #39's Code Review flagged that the #36 restore reflex only handled tracked files → filed #40 → tracked as Action #9 → shipped in PR #49 (`git clean -fd` + re-verify). A finding noticed mid-implementation two milestones ago became a tracked, then resolved, action — the exact "capture what's out of scope, process it later" loop the harness is built on.
+
+**Action taken**: closed — Action Tracker #9 resolved in PR #49.
+
+### Insights
+
+- **Gate 4 earned its keep in production, not a drill.** On PR #46 the retro comment silently failed to post (a heredoc-in-compound-command quirk); the retro-artifact gate flagged the dropout and I re-posted. This is precisely the failure mode (#8) the gate was built for, caught for real.
+- **Validation's deliverable is a report + issues, not a green checkmark.** The foreign-repo task "succeeded" by *finding a bug* — the right success criterion for a validation task, and the reason it was framed that way in the ROADMAP acceptance.
+- **The outward turn was itself a product of the inward discipline.** Four tightly-run inward milestones (clean retros, tracked actions, ADRs) made the "how is this useful?" inflection legible and the pivot cheap — exactly the master_control arc the strategy skill documents.
+
+### Review Stats
+
+| Metric | #46 | #47 | #48 | #49 | Total |
+|--------|-----|-----|-----|-----|-------|
+| Subagent code reviews | 0 (docs) | 0 (docs) | 0 (docs) | 1 | 1 |
+| Review verdict | self/APPROVE | self/APPROVE | self/APPROVE | APPROVE | — |
+| Bugs found (filed) | 1 (#45) | 0 | 0 | 0 | 1 |
+| Gate-4 dropout caught | 1 | 0 | 0 | 0 | 1 |
+| Tags cut | — | — | 4 | — | 4 |
+| CI runs (green) | 1 | 1 | 1 | 1 | 4 |
+
+### Process Improvements Applied
+
+**Docs**: `docs/adoption.md` (PR #47), `docs/releasing.md` (PR #48), `docs/validation/2026-06-04-foreign-repo.md` (PR #46).
+**Release**: first tags `v0.1.0`–`v0.4.0` + documented release flow (PR #48).
+**Skills/templates**: worktree-restore reflex + Code Review prompts now `git clean -fd` untracked files (PR #49).
+**ADR**: ADR-0002 (outward pivot) established (strategy capture, PR #44).
+
+### Open Items
+
+- [ ] `detect_default_branch` foreign-repo bug — Action Tracker #10 (GitHub #45) — **v0.6.0 lead**
 
 ## v0.4.0 — Drift guards (PRs #39, #41)
 
@@ -77,7 +129,7 @@ PR #39's review noted that `git restore --staged --worktree .` only touches trac
 
 ### Open Items
 
-- [ ] Worktree-restore reflex should also clear untracked files — Action Tracker #9 (GitHub #40)
+- [x] Worktree-restore reflex should also clear untracked files — Action Tracker #9 (GitHub #40) — resolved in v0.5.0 (PR #49)
 
 **→ Forward**: strategy session [2026-06-04-v0-4-end](docs/strategy-sessions/2026-06-04-v0-4-end.md) → **v0.5.0 "Outward pivot"** (Path 2). After 4 inward milestones, [ADR-0002](docs/adr/0002-outward-pivot.md) shifts to proving + packaging the family (foreign-repo validation, adoption quickstart, first release/tags). #40 rides along; inward drift ideas deferred.
 
