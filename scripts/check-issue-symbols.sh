@@ -11,7 +11,7 @@
 #
 # Portable to bash 3.2 (macOS default) and BSD grep/sed — no mapfile, no arrays.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 2
 
 command -v gh >/dev/null || { echo "NOTE: gh not on PATH — cannot fetch issues, skipping"; exit 0; }
 
@@ -45,7 +45,7 @@ for issue in "$@"; do
       # looks like a file path → test it exists
       [ -e "$t" ] || missing="$missing $t"
     else
-      grep -rqF --exclude-dir=.git "$t" . 2>/dev/null || missing="$missing $t"
+      grep -rqF --exclude-dir=.git -- "$t" . 2>/dev/null || missing="$missing $t"
     fi
   done <<EOF
 $toks
