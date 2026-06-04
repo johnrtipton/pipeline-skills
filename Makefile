@@ -1,4 +1,4 @@
-.PHONY: check check-branch
+.PHONY: check check-branch check-issues
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
 check: check-branch
@@ -6,3 +6,8 @@ check: check-branch
 # Guard against reintroduced hard-coded default-branch literals (#18).
 check-branch:
 	@bash scripts/check-branch-literals.sh
+
+# Pre-drain staleness check: verify cited symbols still exist (#7).
+# Usage: make check-issues ISSUES="7 6"
+check-issues:
+	@bash scripts/check-issue-symbols.sh $(ISSUES)

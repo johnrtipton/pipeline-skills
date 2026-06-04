@@ -76,6 +76,18 @@ For each open issue not already in the ROADMAP:
    gh pr list --state merged --search "closes #NNN OR fixes #NNN" --limit 5
    ```
    If a merged PR exists, close the issue and skip it.
+5. **Pre-drain staleness check (#7)**: verify the code symbols and file paths the
+   issue body cites still exist — an issue referencing removed code is stale and
+   would waste a pipeline run. Run the shared check (also used by `pipeline-next`
+   when selecting a roadmap task):
+   ```bash
+   make check-issues ISSUES="<NNN> <NNN>"        # or: bash scripts/check-issue-symbols.sh <NNN> ...
+   ```
+   It extracts backtick-wrapped, greppable tokens (file paths, `function()` names)
+   from each issue body and checks they exist in the tree. **Advisory, not a hard
+   drop**: a ⚠ miss means *surface it for review before queuing* (the citation may
+   be conceptual, or the issue may genuinely be stale and should be closed instead
+   of drained). Note any flagged issues in the Step 4 plan.
 
 ### 4. Show the plan
 
