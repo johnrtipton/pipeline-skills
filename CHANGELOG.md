@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   state-file template parses and has the required stage shape (numeric,
   strictly-ascending keys; name/status/verdict/checklist per stage). Wired into
   `make check`.
+- `.github/workflows/ci.yml` — CI runs `make check` (branch-literal guard +
+  template validator), shell-script syntax checks, and a pipeline.py parse on
+  every PR and push, enforcing the gates automatically (ADR-0001). Completes
+  v0.3.0 "Executable gates + CI".
 
 ## [v0.1.0]
 
