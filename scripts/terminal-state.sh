@@ -25,11 +25,14 @@ fi
 # 2. active ROADMAP tasks (run the real parser)
 if command -v python3 >/dev/null && [ -f pipeline.py ]; then
   out=$(python3 pipeline.py auto --project . --list 2>/dev/null || true)
-  if printf '%s' "$out" | grep -qE 'No tasks match|Found 0 tasks'; then
+  # Clean = no tasks at all OR all tasks done (0 *remaining*). The parser prints
+  # "N done, M remaining"; key off M, not the total "Found N tasks" count, so a
+  # fully-shipped milestone (done tasks still listed) reads clean.
+  rem=$(printf '%s' "$out" | sed -n 's/.*, \([0-9]*\) remaining.*/\1/p' | head -1)
+  if printf '%s' "$out" | grep -qE 'No tasks match' || [ "${rem:-x}" = "0" ]; then
     echo "✓ roadmap: 0 active tasks"
   else
-    t=$(printf '%s' "$out" | sed -n 's/.*Found \([0-9]*\) tasks.*/\1/p' | head -1)
-    echo "✗ roadmap: ${t:-some} active task(s)"; clean=1
+    echo "✗ roadmap: ${rem:-some} remaining task(s)"; clean=1
   fi
 else
   echo "• roadmap: no python3/pipeline.py — skipped"
