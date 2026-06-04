@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - `docs/adoption.md` — clone-to-first-PR adoption guide for using the family in
   an external repo, linked from the README (v0.5.0 outward pivot).
+- `docs/releasing.md` — release process; cut the first four tags (`v0.1.0`–`v0.4.0`)
+  retroactively at each milestone's retrospective commit (v0.5.0 outward pivot).
 
 ### Fixed
 - `check-branch-literals.sh` no longer false-positives on backtick-wrapped prose
