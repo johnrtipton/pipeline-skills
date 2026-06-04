@@ -65,6 +65,18 @@ Use this when you've been coding interactively and want to formalize, review, an
    fi
    ```
    Observed cost: max-companion PR #10 was stacked on PR #9 via merge commit `f445b66`. After PR #9 squash-merged, the resume of PR #10's pipeline-ship hit 21 conflicts across 7 files — all "same content, different commit identity." Resolvable but cost ~30 min of focused conflict-resolution work that a Step 2.5 warning would have surfaced upfront.
+2.6. **MANDATORY — review with the THREE-DOT diff (the behind-base phantom-deletion trap).** Every stage that reads the diff — **Stage 1 (Inventory), Stage 3 (Self-Review), and the Stage 7 Code Review subagent** — MUST use the three-dot form:
+   ```bash
+   git diff "origin/$BASE...HEAD"     # ✅ changes since the merge-base — what the PR actually does
+   git diff "origin/$BASE..HEAD"      # ❌ two-dot — LIES when the branch is behind its base
+   ```
+   **Why it matters:** two-dot `A..B` shows B relative to A's *tip*. When your branch is behind its base (base moved ahead after you forked), every commit the base gained shows up as a **phantom deletion** — as if your PR is *removing* that content. Three-dot `A...B` diffs from the merge-base, showing only what your branch changed. GitHub's PR view is three-dot; your local review must match it.
+   ```bash
+   # If the inventory shows large deletions of files/sections your PR never touched, do NOT conclude it reverts them. Confirm:
+   git diff "origin/$BASE...HEAD" --stat      # the real change set
+   git merge-tree "$(git merge-base HEAD "origin/$BASE")" HEAD "origin/$BASE" | grep -c '^<<<<<<<'   # 0 = clean merge
+   ```
+   Observed cost: max-companion PR #10's Stage 1 ran a two-dot diff on a branch 3 commits behind `origin/main` and showed ~90 phantom deletions — including the pipeline-ship Pre-Merge Gate and pipeline-drain Step 8.5 — looking as if the PR *reverted those safety gates*. It did not (three-dot: 984/13, `merge-tree`: 0 conflicts). The danger runs both ways: a false "this PR reverts gates" abort, or — if the phantom deletions are waved off — merging something that *genuinely* reverts base content while the reviewer assumes they're phantom. Always three-dot; when in doubt, `merge-tree`.
 3. Check for existing changes:
    - `git status -s` — must have modified/added/untracked files OR recent commits not on target
    - If no changes found, abort: "Nothing to ship."
