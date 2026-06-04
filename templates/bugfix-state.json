@@ -92,6 +92,7 @@
         {"action": "update existing docs that reference changed behavior", "done": false},
         {"action": "update CHANGELOG.md for fix: changes", "done": false, "mandatory": true},
         {"action": "verify no broken internal links", "done": false},
+        {"action": "if this change adds/renames/removes an enumerated unit (skill, CLI/slash command, plugin, make target, item in a 'supported X' list), update EVERY inventory/index doc that lists its siblings — grep a sibling's name across non-source files to find them; DOCS_ONLY does not exempt this", "done": false},
         {"action": "output DOCS_UPDATED with categorized list", "done": false, "mandatory": true}
       ]
     },
