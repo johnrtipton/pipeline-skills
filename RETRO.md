@@ -17,6 +17,7 @@ issue or be explicitly closed with a reason.
 | 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Closed | Resolved in PR #39 (v0.4.0) — template restore-HEAD step + pipeline-run worktree-restore reflex |
 | 9 | Worktree-restore reflex doesn't remove untracked files left by a subagent | Retro v0.4.0 / PR #39 | #40 | Closed | Resolved in PR #49 (v0.5.0) — `git clean -fd` + re-verify |
 | 10 | `detect_default_branch` returns `main` for a `master`-default repo with no `origin/HEAD` | Retro v0.5.0 / PR #46 | #45 | Closed | Resolved in PR #53 (v0.6.0) — origin-probe + current-branch fallback; validated end-to-end in PR #55 |
+| 11 | `/pipeline-cycle` + terminal-state can livelock on a deferred-but-open issue | Retro v0.7.0 / PR #59 | #61 | Open | terminal-state counts all open issues; an issue triage never promotes stalls the loop. Fix: exclude `backlog`/`wontfix` from the clean check, or strategy must close-with-reason |
 
 <!-- Milestone retro entry template:
 ## <milestone> — <Title> (PRs #NN–#MM)
@@ -27,6 +28,58 @@ issue or be explicitly closed with a reason.
 ### Review Stats
 ### Open Items
 -->
+
+## v0.7.0 — Self-driving the loop (PR #59)
+
+**Date**: 2026-06-04
+**Scope**: Added `/pipeline-cycle`, the outer-loop orchestrator (semi-autonomous default + `--auto` opt-in), `scripts/terminal-state.sh` + `make terminal-state`, and ADR-0003 — the family can now drive its own plan→execute→close cadence. All three v0.7.0 tasks shipped grouped in one PR (one SKILL.md + one detector).
+**Tests at close**: n/a — CI green; `make terminal-state` validated.
+
+### What We Learned
+
+**1. The capstone shipped: the family can self-drive the loop.**
+`/pipeline-cycle` chains `strategy → run --all → retro` to the clean terminal state, pausing at strategy decisions by default (ADR-0003) and going hands-off under `--auto`. It formalizes the exact cadence a human drove ~20× across the prior six milestones, and closes the `--all-milestones` gap (it plans + retros between milestones, which `--all-milestones` does not).
+
+**Action taken**: closed — shipped in PR #59 (skill + `--auto` + terminal-state detector).
+
+**2. The loop has a termination gap on deferred-but-open issues.**
+`terminal-state.sh` counts all open issues toward not-clean, so a retro finding filed as an open issue that triage perpetually deprioritizes stalls `/pipeline-cycle` — livelock under `--auto`, repeated re-surfacing in semi mode. The design assumes every open issue is eventually worked or closed. Surfaced in the PR #59 review discussion (and this retro filed it, which the next `/pipeline-strategy` will pick up — the loop closing on itself).
+
+**Action taken**: Open — tracked in Action Tracker #11 (GitHub #61).
+
+**3. Review caught a stop-condition bug in the detector itself.**
+`terminal-state.sh` first keyed off the parser's total `Found N tasks` instead of `M remaining`, so a fully-shipped-but-reconciled milestone would never read clean — meaning `/pipeline-cycle` could never terminate on a normal repo. Code review caught it; fixed before merge to key off `remaining == 0`.
+
+**Action taken**: closed — fixed in PR #59 (commit 4c8e3be), re-verified.
+
+### Insights
+
+- **Live #840 failure mode, recovered.** I skipped Stage 1's branch creation and committed onto local `main`; the push failed (`src refspec`), and I recovered via `git branch` + `reset --hard origin/main` (origin/main never touched). The State-File Gate / branch-verify reflex are *executor-dependent* at branch-creation time — here the missing-branch push-fail backstopped the slip. A candidate future hardening: make branch-existence a programmatic pre-commit gate like the others. Fitting that it happened on the milestone that automates the loop.
+- **Self-referential validation again**: `terminal-state.sh` reports NOT_CLEAN mid-milestone, correctly flagging its own milestone's open tasks + the still-Proposed ADR-0003 — the detector catching the incompleteness of the work that built it.
+- **The retro→issue→survey→plan chain is now mechanical, not manual.** This retro filing #61 means the next strategy survey (or `/pipeline-cycle` iteration) will surface it as a candidate — the exact loop the user asked about, demonstrated end to end.
+
+### Review Stats
+
+| Metric | PR #59 |
+|--------|--------|
+| Subagent code reviews | 1 |
+| Review verdict | COMMENT (1 substantive fix applied) |
+| 🔴 Findings | 0 |
+| Bugs caught & fixed pre-merge | 1 (terminal-state remaining-vs-total) |
+| Deferred to issue | 1 (#61 livelock gap) |
+| Recovered process slips | 1 (#840 branch-on-main) |
+| CI runs (green) | 1 |
+
+### Process Improvements Applied
+
+**Skills**: `/pipeline-cycle` orchestrator added (PR #59).
+**Scripts**: `scripts/terminal-state.sh` + `make terminal-state` (PR #59).
+**ADR**: ADR-0003 (loop autonomy boundary) established.
+**Inventory**: README/CLAUDE.md/install.sh updated for the new skill (Stage-5 gate).
+
+### Open Items
+
+- [ ] `/pipeline-cycle` termination gap on deferred-but-open issues — Action Tracker #11 (GitHub #61)
 
 ## v0.6.0 — Follow through on the pivot (PRs #53, #54, #55)
 
