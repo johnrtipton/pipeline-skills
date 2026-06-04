@@ -79,6 +79,8 @@ PR #39's Code Review flagged that the #36 restore reflex only handled tracked fi
 
 - [ ] `detect_default_branch` foreign-repo bug — Action Tracker #10 (GitHub #45) — **v0.6.0 lead**
 
+**→ Forward**: strategy session [2026-06-04-v0-5-end](docs/strategy-sessions/2026-06-04-v0-5-end.md) → **v0.6.0 "Follow through"** (Path 1): fix #45, fuller end-to-end foreign-repo validation, flip ADR-0001/0002 to Accepted. Continues ADR-0002; no new ADR.
+
 ## v0.4.0 — Drift guards (PRs #39, #41)
 
 **Date**: 2026-06-04
