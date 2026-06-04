@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - `scripts/pipeline-gates.sh` — the pipeline quality gates as executable
   functions (Gate 1-4 + pipeline-ship pre-merge), per ADR-0001 (#28).
+- `scripts/validate-templates.sh` + `make validate-templates` — validates every
+  state-file template parses and has the required stage shape (numeric,
+  strictly-ascending keys; name/status/verdict/checklist per stage). Wired into
+  `make check`.
 
 ## [v0.1.0]
 
