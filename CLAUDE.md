@@ -26,6 +26,7 @@ extracts verdict from output → updates state file → repeats for next stage
 - `pipeline.py` — The harness: state management, verdict extraction, stage loop, ROADMAP parser, auto mode, profile system
 - `profiles/*.json` — Framework-specific customization (security patterns, checklist items, auto-reject triggers)
 - `templates/*.json` — State file templates defining all stages, checklists, verdicts, and subagent prompts per pipeline type. Mandatory checklist items here are the strongest form of project canon (see [CANON.md](CANON.md) for how this venue compares to CLAUDE.md / pre-push / CI).
+- `skills/pipeline-init/SKILL.md` — One-time repo bootstrap: detects default branch + test/lint/build commands, scaffolds `.pipeline-state/` and `.pipeline-templates/` (copied from `templates/*.json` with the detected branch/commands substituted), gitignore entries, CHANGELOG/RETRO stubs, and a `CLAUDE.md` pipeline-config block. Run once per repo before any other pipeline-* skill
 - `skills/pipeline-shared/SKILL.md` — Shared stage procedures (environment check, testing, security, review, merge, retro)
 - `skills/pipeline-next/SKILL.md` — Task picker: parses ROADMAP.md, filters by milestone/priority, groups related tasks
 - `skills/pipeline-run/SKILL.md` — Stage executor: reads state file, spawns agents per stage, updates state
