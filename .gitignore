@@ -6,3 +6,4 @@ __pycache__/
 
 .pipeline-state/
 .pipeline-log.md
+scratch/
