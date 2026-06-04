@@ -439,6 +439,15 @@ Driven by the Step 1.3 classification. The output MUST parse under the REAL
 - Reserved `## ` sections are skipped: `completed`, `future`, `post-1.0`,
   `contributing`, `investigate`, `differentiators`, `parity tracker`,
   `priority matrix` (matched as substrings of the lowercased h2 heading).
+- **Milestones MUST sit under a NON-reserved `## ` h2 (the in-skip trap).** The
+  parser sets an in-skip flag at every reserved `## ` heading — including
+  `## Priority Matrix` — and clears it ONLY at the next `## `; while in-skip it
+  skips milestone AND feature detection entirely. So a `### Milestone:` placed
+  directly after `## Priority Matrix` (with no non-reserved `## ` between) is
+  NEVER parsed → **0 tasks** (verified failure mode). Put the milestone(s) under a
+  non-reserved `## ` heading such as `## Milestones`, and make `Completed` /
+  `Future` / `Contributing` real `## ` (h2) headings — NOT `###` — so they
+  re-enter skip correctly.
 - Priority is joined from the matrix to the milestone feature by name: exact
   (normalized: backticks stripped, lowercased, whitespace collapsed) FIRST, then
   ≥2-significant-word overlap. To guarantee the join, use a BYTE-IDENTICAL
@@ -468,6 +477,8 @@ IDENTICAL string `First task`:
 |----------|---------|-----|-----------|
 | **P1** | First task | Replace with a real reason. `some_function()` (#1) | <BASE_VERSION> |
 
+## Milestones
+
 ### Milestone: <BASE_VERSION> — Initial milestone
 
 **First task**
@@ -476,10 +487,15 @@ Describe the first task. Embed greppable hooks like `ClassName`,
 it. Do NOT start any line in this spec with `**bold**` — that would register as a
 separate phantom feature.
 
-### Completed
+## Completed
 
-### Future
+## Future
 ```
+
+> The `## Milestones` h2 between the matrix and the `### Milestone:` is REQUIRED —
+> without a non-reserved `## ` there, `## Priority Matrix` leaves the parser
+> in-skip and no task is found (see the in-skip-trap requirement above).
+> `Completed`/`Future` are `## ` (h2), not `###`.
 
 #### 4.3 FOREIGN → migrate in place (the stock-repo case), backing up first
 
@@ -500,13 +516,13 @@ Apply these deterministic mapping rules:
 
 | Source element | Migrated to |
 |---|---|
-| `\`[x]\`` item (done) | a `### Completed` narrative line; if it had a matrix row, write it struck-through shipped: `\| ~~**Px**~~ \| ~~<name>~~ ✅ Shipped in PR #NNN (\`<path>\`) \| ~~<why>~~ \| ~~<ver>~~ \|` when a PR/path ref is recoverable, else `✅ Shipped (migrated from ROADMAP item N; no PR ref)` carrying the existing `Done <date>` note verbatim. NOT selectable by next (correct). |
+| `\`[x]\`` item (done) | a `## Completed` narrative line; if it had a matrix row, write it struck-through shipped: `\| ~~**Px**~~ \| ~~<name>~~ ✅ Shipped in PR #NNN (\`<path>\`) \| ~~<why>~~ \| ~~<ver>~~ \|` when a PR/path ref is recoverable, else `✅ Shipped (migrated from ROADMAP item N; no PR ref)` carrying the existing `Done <date>` note verbatim. NOT selectable by next (correct). |
 | `\`[~]\`` item (in progress) | active selectable feature: plain matrix row + `**Feature**` entry under the active milestone, using the SAME byte-identical name in both |
 | `\`[ ]\`` item (pending) | active selectable feature, same as in-progress (no "resume" marker — resume is tracked in `.pipeline-state/`, not the ROADMAP) |
-| `## Active work` | split by status: `[x]` → `### Completed`; `[~]`/`[ ]` → active milestone detail |
-| `## Completed` | `### Completed` (reserved; skipped by next — correct) |
-| `## Backlog (not scheduled)` | `### Future` (reserved; skipped — correct) |
-| `## How to update this file` | preserved verbatim under `### Contributing` (reserved; skipped) so the prose isn't lost |
+| `## Active work` | split by status: `[x]` → `## Completed`; `[~]`/`[ ]` → active milestone detail |
+| `## Completed` | `## Completed` (reserved; skipped by next — correct) |
+| `## Backlog (not scheduled)` | `## Future` (reserved; skipped — correct) |
+| `## How to update this file` | preserved verbatim under `## Contributing` (reserved; skipped) so the prose isn't lost |
 
 **Name-join invariant (REQUIRED).** The string written into the matrix `Feature`
 cell for an active item MUST be byte-identical to the `**Bold Name**` used for its
@@ -527,11 +543,13 @@ not audit-verified.
 
 **Numbered `### N. Title` → one active milestone + features.** The numbered items
 are work items, NOT versions. Collapse them into ONE active milestone whose
-version comes from Step 1.5 (no tags → `v0.1.0`): heading `### Milestone:
-<base-version> — Active work`. Each numbered item becomes a `**Title**` feature
-inside it (or a `### Completed` line if `[x]`). Drop the numeric prefix from the
-bold name (carries no priority) but preserve it in the spec text as "(was roadmap
-item N)" for traceability.
+version comes from Step 1.5 (no tags → `v0.1.0`). Emit a non-reserved
+`## Milestones` h2 FIRST (required — it clears the in-skip flag that
+`## Priority Matrix` set; without it the parser finds 0 tasks), then the heading
+`### Milestone: <base-version> — Active work` under it. Each numbered item becomes
+a `**Title**` feature inside it (or a `## Completed` line if `[x]`). Drop the
+numeric prefix from the bold name (carries no priority) but preserve it in the
+spec text as "(was roadmap item N)" for traceability.
 
 **De-bold preserved prose to avoid phantom features.** When copying an item's body
 into the feature's spec text, REFLOW every leading `**Label:**` marker so no spec
@@ -577,8 +595,8 @@ as struck-through `✅ Shipped (migrated …; no PR ref)` rows and item 8 a plai
 `| **P1** | restore rust ↔ python parity | … | v0.1.0 |`; one `### Milestone:
 v0.1.0 — Active work` with item 8 as the sole active `**restore rust ↔ python
 parity**` feature (its `[~]` prose preserved, all `**Label:**` lead-ins
-de-bolded); `### Completed` holding items 1–7 plus the existing Completed
-entries; `### Future` from the backlog; and `### Contributing` from "How to
+de-bolded); `## Completed` holding items 1–7 plus the existing Completed
+entries; `## Future` from the backlog; and `## Contributing` from "How to
 update this file". This parses under `pipeline.py`, so `/pipeline-next --list`
 returns item 8 as the selectable task — classified **bugfix**, priority **P1**.
 
@@ -723,6 +741,12 @@ pipeline-config block — and **no skill edit is needed**. The verification step
 - **Short-circuiting branch detection to the current branch** — on the stock repo
   the current branch was `experiment/strategy-optimization`, not the default. Run
   the full resolution chain.
+- **Placing `### Milestone:` directly under `## Priority Matrix` (the in-skip
+  trap)** — the parser goes in-skip at `## Priority Matrix` and only leaves it at
+  the next `## `, skipping milestone/feature detection meanwhile, so the milestone
+  is never parsed → 0 tasks. Always put a non-reserved `## ` (e.g. `## Milestones`)
+  between the matrix and the first `### Milestone:`, and make `Completed`/`Future`/
+  `Contributing` real `## ` (h2), not `###`. (Field-observed 0-task failure.)
 - **Emitting a Priority Matrix without a `Why` column** — `parse_priority_matrix`
   only enters the table when the header has `Priority` AND `Feature` AND `Why`. A
   `Description` column instead of `Why` makes the whole matrix invisible and every
