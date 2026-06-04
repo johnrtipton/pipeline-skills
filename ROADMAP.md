@@ -6,12 +6,26 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
+| **P1** | pipeline-cycle orchestrator skill | The missing outer loop: a human drove strategy→run→retro→strategy ~20x by hand across 6 milestones. Add `/pipeline-cycle` that chains them — semi-autonomous by default, stopping at strategy decisions + on failure (per ADR-0003) | v0.7.0 |
+| **P1** | pipeline-cycle --auto full-autonomy flag | An explicit opt-in flag that auto-confirms strategy (light mode) and drives to the terminal state with no human gate — deliberate, never the default | v0.7.0 |
+| **P2** | terminal-state detector | The cycle's stop condition: clean = 0 open issues + 0 active ROADMAP tasks + no `Proposed` ADR + CI green | v0.7.0 |
 
-_No active tasks — v0.6.0 shipped (PRs #53–#55). No open issues. Larger drift-guard ideas remain in `## Future`; run `/pipeline-strategy` to plan v0.7.0._
+_Chosen via strategy session [2026-06-04-self-driving-loop](docs/strategy-sessions/2026-06-04-self-driving-loop.md). Directional — see [ADR-0003](docs/adr/0003-loop-autonomy-boundary.md)._
 
 ## Milestones
 
-_No active milestone. See `## Completed` for v0.6.0._
+### Milestone: v0.7.0 — Self-driving the loop
+
+**pipeline-cycle orchestrator skill**
+Add `skills/pipeline-cycle/SKILL.md`: a state-file-driven outer loop that runs `/pipeline-strategy` → (if a milestone is captured) `/pipeline-run --milestone <v> --all` → `/pipeline-retro` → back to strategy. **Default is semi-autonomous**: it runs execution autonomously but STOPS and hands control to the human at every `/pipeline-strategy` Stage-7 path decision, and on any stage failure. Loop terminates when the terminal-state detector reports clean OR strategy's brainstorm yields no pass-tagged candidates. Per ADR-0003. Acceptance: the skill exists and is installed; **adding it updates the README skill table, the CLAUDE.md Key-components list, and install.sh** (the Stage-5 enumerated-unit inventory gate); a dry-run shows the loop structure without executing.
+
+**pipeline-cycle --auto full-autonomy flag**
+Add a `--auto` flag to `/pipeline-cycle` that runs `/pipeline-strategy` in auto-confirm (light) mode throughout, removing the human gate so the loop drives to the terminal state hands-off. This is a deliberate opt-in, NOT the default. Acceptance: without `--auto` the loop pauses at strategy decisions; with `--auto` it auto-confirms the recommended path and continues; ADR-0003 documents the trade-off.
+
+**terminal-state detector**
+Add a check (script or `make` target) that reports the repo's "clean" terminal state: 0 open issues, 0 active ROADMAP tasks (parser), no ADR left at `Proposed`, CI green. `/pipeline-cycle` uses it as the stop condition. Acceptance: it reports clean on the current repo state and not-clean when any condition fails.
+
+## Completed` for v0.6.0._
 
 ## Completed` for v0.5.0._
 

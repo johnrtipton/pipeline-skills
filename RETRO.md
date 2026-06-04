@@ -74,6 +74,8 @@ ADR-0001 (executable gates) and ADR-0002 (outward pivot) were both implemented a
 
 - None. Action Tracker has no open rows; 0 open issues at milestone close.
 
+**→ Forward**: strategy session [2026-06-04-self-driving-loop](docs/strategy-sessions/2026-06-04-self-driving-loop.md) → **v0.7.0 "Self-driving the loop"**: add `/pipeline-cycle` (semi-autonomous default + `--auto` opt-in) + a terminal-state detector. Directional → [ADR-0003](docs/adr/0003-loop-autonomy-boundary.md) (the loop is human-gated at strategy decisions; full autonomy is opt-in).
+
 ## v0.5.0 — Outward pivot (PRs #46, #47, #48, #49)
 
 **Date**: 2026-06-04
