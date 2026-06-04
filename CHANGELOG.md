@@ -26,6 +26,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   retroactively at each milestone's retro commit (#48).
 
 ### Fixed
+- `/pipeline-cycle` terminal-state now ignores `backlog`/`wontfix`/`someday`-labelled
+  issues, so a deliberately-deferred open issue can't livelock the loop; the
+  deferred-label rule is documented in the cycle skill + ADR-0003 (#61).
 - `detect_default_branch` now resolves a `master`-default repo with no `origin`
   to `master` (was `main`): adds an `origin/<cand>` existence probe and a
   current-branch fallback before the `main` literal, reaching parity with the
