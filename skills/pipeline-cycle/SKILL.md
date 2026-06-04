@@ -44,6 +44,11 @@ away — it is the design.
 1. Terminal-state check — `make terminal-state` (or scripts/terminal-state.sh).
    If CLEAN (0 open issues, 0 active ROADMAP tasks, no Proposed ADR, CI green)
    → the work is done. STOP, print the cycle summary.
+   **Deferred-issue rule (#61):** the open-issues check ignores issues labelled
+   `backlog`/`wontfix`/`someday`. An issue you choose not to do must be closed
+   (with reason) or carry one of those labels — otherwise it keeps the loop from
+   ever reaching terminal (livelock under `--auto`). "Open and unlabelled" = "in
+   scope for the loop."
 
 2. Are there active ROADMAP tasks for an open milestone?
    - YES → skip to step 4 (execute the already-planned milestone).

@@ -7,11 +7,13 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
 
-_No active tasks — v0.7.0 shipped (PR #59). No open issues. The family can now self-drive: `/pipeline-cycle` plans→executes→closes to a clean terminal state. Run `/pipeline-strategy` (or `/pipeline-cycle`) to plan v0.8.0._
+_No active tasks — v0.8.0 shipped via `/pipeline-cycle --auto`. Larger drift-guard ideas remain in `## Future`._
 
 ## Milestones
 
-_No active milestone. See `## Completed` for v0.7.0._
+_No active milestone. See `## Completed` for v0.8.0._
+
+## Completed` for v0.7.0._
 
 ## Completed` for v0.6.0._
 
@@ -20,6 +22,8 @@ _No active milestone. See `## Completed` for v0.7.0._
 ## Completed` for v0.4.0._
 
 ## Completed
+
+- v0.8.0 — Cycle hardening (first `/pipeline-cycle --auto` run): terminal-state ignores `backlog`/`wontfix`/`someday`-labelled issues so a deferred-but-open issue can't livelock the loop (#61); flipped ADR-0003 to Accepted. ✅ Shipped
 
 - v0.7.0 — Self-driving the loop: `/pipeline-cycle` orchestrator + `--auto` full-autonomy flag + `terminal-state` detector, all shipped in one grouped PR #59. Established ADR-0003 (the loop is human-gated at strategy decisions; full autonomy is opt-in). ✅ Shipped
 

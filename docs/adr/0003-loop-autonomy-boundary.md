@@ -1,6 +1,6 @@
 # ADR-0003: The loop is human-gated at strategy decisions; full autonomy is opt-in
 
-**Status**: Proposed
+**Status**: Accepted — implemented in v0.7.0 (PR #59); deferred-label rule added v0.8.0
 **Date**: 2026-06-04
 **Source**: Strategy session [2026-06-04-self-driving-loop](../strategy-sessions/2026-06-04-self-driving-loop.md)
 
@@ -42,6 +42,14 @@ Full hands-off autonomy is available **only behind an explicit `--auto` flag**,
 which auto-confirms the strategy recommendation (light mode throughout). `--auto`
 is a deliberate opt-in for low-stakes or well-bounded backlogs — never the
 default.
+
+**Deferred work must be labelled, not just left open (v0.8.0, #61).** The
+terminal-state detector treats every open issue as unfinished work, so a
+deliberately-deferred-but-open issue would stall the loop (livelock under
+`--auto`). The rule: an issue you choose NOT to do must be either closed
+(with reason) or labelled `backlog`/`wontfix`/`someday`; `terminal-state.sh`
+excludes those labels from its clean check. "Open and unlabelled" means "still
+in scope for the loop."
 
 ## Consequences
 

@@ -14,10 +14,14 @@ cd "$(dirname "$0")/.." || exit 2
 
 clean=0  # 0 = clean so far; set to 1 on any failed check
 
-# 1. open issues
+# 1. open issues — EXCLUDING deliberately-deferred ones (#61). An issue carrying
+#    a `backlog`/`wontfix`/`someday` label is a logged decision to defer, not
+#    unfinished work, so it must not stall /pipeline-cycle toward terminal.
 if command -v gh >/dev/null; then
-  n=$(gh issue list --state open --json number -q 'length' 2>/dev/null || echo "?")
-  if [ "$n" = "0" ]; then echo "✓ issues: 0 open"; else echo "✗ issues: $n open"; clean=1; fi
+  n=$(gh issue list --state open --json number,labels \
+        -q '[.[] | select((.labels | map(.name)) | any(. == "backlog" or . == "wontfix" or . == "someday") | not)] | length' \
+        2>/dev/null || echo "?")
+  if [ "$n" = "0" ]; then echo "✓ issues: 0 open (excluding backlog/wontfix/someday)"; else echo "✗ issues: $n open"; clean=1; fi
 else
   echo "• issues: gh not on PATH — skipped"
 fi
