@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Fixed
+- `check-branch-literals.sh` no longer false-positives on backtick-wrapped prose
+  mentions of `git diff origin/main` etc.: it strips inline-code spans before
+  matching, so doc examples are ignored while real fenced-block commands are
+  still caught (#29).
 - Review subagents no longer leave the executor's working tree on the base
   branch: the Code Review `subagent_prompt` in all four templates now restores
   HEAD on exit, and pipeline-run gains a worktree-restore reflex before any
