@@ -6,30 +6,20 @@ Active, selectable work. Priorities are a heuristic starting point — adjust fr
 
 | Priority | Feature | Why | Milestone |
 |----------|---------|-----|-----------|
-| **P1** | fix detect_default_branch foreign-repo bug | `pipeline.py detect_default_branch` returns `main` for a `master`-default repo with no `origin/HEAD`; add the local-branch probe + current-branch fallback the pipeline-init SKILL chain already documents (#45) | v0.6.0 |
-| **P1** | fuller end-to-end foreign-repo validation | v0.5.0 validation skipped the PR-dependent stages (no remote); run a real throwaway GitHub repo through `init → next → run → retro` including Commit/Review/Merge | v0.6.0 |
-| **P2** | flip ADR statuses to Accepted | ADR-0001 (executable gates) and ADR-0002 (outward pivot) are implemented and in force but still marked Proposed — the ADR-status drift the pipeline-shared Documentation stage flags | v0.6.0 |
 
-_Chosen via strategy session [2026-06-04-v0-5-end](docs/strategy-sessions/2026-06-04-v0-5-end.md) (Path 1 — Follow through). Continues ADR-0002; no new ADR._
+_No active tasks — v0.6.0 shipped (PRs #53–#55). No open issues. Larger drift-guard ideas remain in `## Future`; run `/pipeline-strategy` to plan v0.7.0._
 
 ## Milestones
 
-### Milestone: v0.6.0 — Follow through on the pivot
-
-**fix detect_default_branch foreign-repo bug**
-Bring `pipeline.py detect_default_branch` to parity with the pipeline-init SKILL's documented chain: after the CLAUDE.md / `origin/HEAD` / `git remote show` probes, add a local-branch probe (`git rev-parse --verify` for main/master/development) and a current-branch fallback before the literal `main`. Tracks issue (#45). Acceptance: on a `master`-default repo with no `origin`, it returns `master`, not `main`.
-
-**fuller end-to-end foreign-repo validation**
-Create a throwaway GitHub repo (ideally `master`-default / non-python), run the full family — `/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-retro` — including the PR-dependent stages (Commit & PR, Code Review, Merge) that the v0.5.0 local-only validation could not exercise. Append to the `docs/validation/` report; file any new gaps as issues. Acceptance: a report covering the PR stages exists.
-
-**flip ADR statuses to Accepted**
-Update ADR-0001 and ADR-0002 from `Proposed` to `Accepted — implemented in <versions>` (0001 in v0.3.0; 0002 in v0.5.0). Acceptance: no in-force ADR is left marked Proposed.
+_No active milestone. See `## Completed` for v0.6.0._
 
 ## Completed` for v0.5.0._
 
 ## Completed` for v0.4.0._
 
 ## Completed
+
+- v0.6.0 — Follow through on the pivot: fixed detect_default_branch for master/no-origin repos (#45, PR #53); end-to-end foreign-repo validation incl. PR stages on a real master/Node repo (PR #55); flipped ADR-0001/0002 to Accepted (PR #54). ✅ Shipped
 
 - v0.5.0 — Outward pivot (ADR-0002): foreign-repo validation surfaced branch-detection bug #45 (PR #46); adoption quickstart `docs/adoption.md` (PR #47); release process + first tags v0.1.0–v0.4.0 (PR #48); worktree-restore reflex clears untracked files (#40, PR #49). ✅ Shipped
 
