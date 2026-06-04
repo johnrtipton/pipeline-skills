@@ -2,7 +2,7 @@
 
 A development pipeline harness for Claude Code. Runs multi-stage pipelines (feature, bugfix, refactor, strategy) with enforced quality gates, PR reviews, and retrospectives. Ships as both:
 
-- **9 interactive skills** (`/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-strategy`, etc.) for use from a Claude Code chat — this is the primary interface
+- **9 interactive skills** (`/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-strategy`, etc.) for use from a Claude Code chat — this is the primary interface
 - **`pipeline.py` harness** for autonomous / headless runs against a project
 
 ## The Problem
@@ -19,6 +19,7 @@ Each skill is a single `SKILL.md` invoked by typing `/<skill-name>` in Claude Co
 
 | Skill | What it does | When to use |
 |-------|--------------|-------------|
+| [`/pipeline-init`](skills/pipeline-init/SKILL.md) | One-time repo setup. Detects the default branch, test/lint/build commands, ROADMAP format, and version scheme, then scaffolds `.pipeline-state/`, `.pipeline-templates/` (copied from the canonical templates with the detected branch + commands substituted), gitignore entries, CHANGELOG/RETRO stubs, and a `CLAUDE.md` pipeline-config block — migrating a foreign-format ROADMAP to the canonical priority-matrix + milestone format the parser reads | Once per repo, before any other pipeline-* skill, or to repair a partial setup |
 | [`/pipeline-next`](skills/pipeline-next/SKILL.md) | Parses `ROADMAP.md`, filters by milestone/priority, picks the next task, creates `.pipeline-state/<branch>.json` from the template. Can `--group` related small features into batches | Start of every feature from a roadmap |
 | [`/pipeline-run`](skills/pipeline-run/SKILL.md) | Stage executor. Reads the state file, spawns agents for each pending stage, updates state after each. Can process a single task, all tasks in a milestone (`--all`), or all milestones | After `/pipeline-next`, or to resume an interrupted run |
 | [`/pipeline-ship`](skills/pipeline-ship/SKILL.md) | Takes existing uncommitted/committed changes in your working tree and runs them through test → review → security → docs → commit → PR → code review → merge → retro | When you've been coding interactively and want to formalize and ship |
@@ -32,6 +33,9 @@ Each skill is a single `SKILL.md` invoked by typing `/<skill-name>` in Claude Co
 ### How the skills chain
 
 ```
+ONE-TIME REPO SETUP:
+  /pipeline-init                             # detect branch/commands, scaffold state + templates + config
+
 FEATURE FROM ROADMAP:
   /pipeline-next --milestone v0.4.0          # pick P0 task, create state file
   /pipeline-next --milestone v0.4.0 --group  # pick + batch related small tasks
@@ -68,11 +72,12 @@ cd ~/pipeline-skill
 ./install.sh --symlink
 
 # In Claude Code, from within your target project:
+/pipeline-init                     # one-time: scaffold state, templates, config (run once per repo)
 /pipeline-next --milestone v0.4.0
 /pipeline-run
 ```
 
-That's it. Your project should have a `ROADMAP.md` for `/pipeline-next` to parse, a `CLAUDE.md` for project-specific rules, and ideally a `.pipeline-templates/feature-state.json` if you want to customize stages (otherwise the built-in templates are used).
+`/pipeline-init` is the one-time bootstrap: it detects the repo's default branch and test/lint/build commands, scaffolds `.pipeline-state/` and `.pipeline-templates/`, adds the gitignore entries, and writes a `CLAUDE.md` pipeline-config block — migrating a non-conforming `ROADMAP.md` to the priority-matrix + milestone format `/pipeline-next` parses. Run it once per repo (or to repair a partial setup); after that, `/pipeline-next` → `/pipeline-run` is the daily loop.
 
 ### Also supported: autonomous `pipeline.py` harness
 
@@ -244,6 +249,7 @@ pipeline-skill/
 │   ├── ship-state.json                 # Ship pipeline template (10 stages)
 │   └── strategy-state.json             # Strategy session template (8 stages)
 └── skills/
+    ├── pipeline-init/SKILL.md          # One-time repo bootstrap (state, templates, config)
     ├── pipeline-next/SKILL.md          # Task picker from ROADMAP.md
     ├── pipeline-run/SKILL.md           # Stage executor
     ├── pipeline-ship/SKILL.md          # Ship existing working tree changes
