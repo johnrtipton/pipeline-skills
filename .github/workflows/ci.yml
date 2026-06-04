@@ -1,0 +1,31 @@
+name: CI
+
+# v0.3.0 (ADR-0001): enforce the pipeline's own quality gates automatically on
+# every PR and push, so the checks stop depending on a manual `make check`.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # branch-literal guard greps history; gates inspect commits
+
+      - name: make check (branch-literal guard + template validator)
+        run: make check
+
+      - name: Syntax-check all shell scripts
+        run: |
+          rc=0
+          for f in scripts/*.sh; do
+            bash -n "$f" && echo "ok $f" || { echo "syntax error in $f"; rc=1; }
+          done
+          exit $rc
+
+      - name: Sanity-check pipeline.py parses
+        run: python3 -c "import ast; ast.parse(open('pipeline.py').read()); print('pipeline.py OK')"
