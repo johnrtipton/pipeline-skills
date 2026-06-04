@@ -128,6 +128,28 @@ Read the template file — **check project-local templates first**:
 
 Write to `.pipeline-state/<branch-name>.json`. Ensure `.pipeline-state/` is in `.gitignore`.
 
+### 7.5 Derive the test-coverage expectation (#9)
+
+Before handing off to `/pipeline-run`, state — at selection time, while the
+task's intent is freshest — what test coverage the implementation is expected
+to add, so coverage is a design input rather than a Stage-2 afterthought.
+Derive it from the task type and the symbols the ROADMAP spec cites:
+
+- **bugfix** → a regression test that *fails before the fix and passes after*,
+  reproducing the reported broken behavior.
+- **feature** → unit tests for each new public symbol the spec names
+  (`ClassName`, `function_name()`), plus one integration/path test if the
+  feature crosses a boundary (view, endpoint, event handler).
+- **docs-only / config-only** → "no new tests expected" (state it explicitly so
+  the run doesn't invent busywork).
+- **repo has no test suite** (per the CLAUDE.md pipeline-config `test_command`
+  being empty) → state "no suite — manual/verification only" so Stage 2 doesn't
+  fabricate a command.
+
+Record it in the state file as `coverage_expectation` (a one-line string) and
+surface it in the Output below. The Test/Self-Review stages read it as the
+coverage bar to meet.
+
 ### 8. Output
 
 **Single task:**
@@ -138,6 +160,7 @@ Write to `.pipeline-state/<branch-name>.json`. Ensure `.pipeline-state/` is in `
   Branch: <branch-name>
   State: .pipeline-state/<file>.json
   Stages: <N> (from template)
+  Coverage expectation: <one-line, from step 7.5>
 ═══════════════════════════════════════════
 ```
 

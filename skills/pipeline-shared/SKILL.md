@@ -314,6 +314,25 @@ IMPROVEMENT: Security: <brief description of issue and file>
 
 **Important**: Use the Agent tool to run this as a subagent for independent evaluation with clean context.
 
+### Scope discipline — leave pre-existing lint untouched (#5)
+
+The same "changed files / changed lines only" rule that governs the security
+scan governs **lint and formatting**: a scoped PR fixes only the lint it
+*introduces*, not pre-existing warnings in code it happens to touch or sit near.
+
+- If the project lint command (Self-Review stage) reports warnings, fix only
+  those attributable to **this PR's diff**. A warning on a line the PR did not
+  change is **pre-existing** — report it as `IMPROVEMENT: Lint: <file:line>`,
+  do NOT fix it in this PR, and do NOT let it fail the gate.
+- Bulk-fixing unrelated lint balloons the diff, breaks the batch-size limit,
+  and buries the real change under noise the reviewer can't separate from it.
+- If pre-existing lint is worth fixing, that's a separate scoped pass — file it
+  via the normal capture channel (retro `IMPROVEMENT:` line → tech-debt issue →
+  `/pipeline-drain`), exactly like the "capture what's out of scope" rule.
+
+This mirrors the security stage's pre-existing-issue handling above: capture,
+don't block, don't sprawl.
+
 ---
 
 ## Documentation
