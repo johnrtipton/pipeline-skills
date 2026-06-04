@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- `docs/adoption.md` — clone-to-first-PR adoption guide for using the family in
+  an external repo, linked from the README (v0.5.0 outward pivot).
+
 ### Fixed
 - `check-branch-literals.sh` no longer false-positives on backtick-wrapped prose
   mentions of `git diff origin/main` etc.: it strips inline-code spans before

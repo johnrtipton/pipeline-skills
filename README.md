@@ -79,6 +79,8 @@ cd ~/pipeline-skill
 
 `/pipeline-init` is the one-time bootstrap: it detects the repo's default branch and test/lint/build commands, scaffolds `.pipeline-state/` and `.pipeline-templates/`, adds the gitignore entries, and writes a `CLAUDE.md` pipeline-config block — migrating a non-conforming `ROADMAP.md` to the priority-matrix + milestone format `/pipeline-next` parses. Run it once per repo (or to repair a partial setup); after that, `/pipeline-next` → `/pipeline-run` is the daily loop.
 
+> Adopting the family in **your own repo**? See the step-by-step [adoption guide](docs/adoption.md) (clone → first shipped PR).
+
 ### Also supported: autonomous `pipeline.py` harness
 
 For headless / CI / cron runs, there's a `pipeline.py` external harness. Most developers won't need this — the interactive skills are the primary interface. Skip to [`pipeline.py` details](#pipelinepy-autonomous-harness-advanced) below if you have a reason to run the pipeline without a human in the chat.
