@@ -1,4 +1,4 @@
-.PHONY: check check-branch check-issues validate-templates
+.PHONY: check check-branch check-issues validate-templates terminal-state
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
 check: check-branch validate-templates
@@ -20,3 +20,7 @@ check-issues:
 # Usage: make sub-pr PR=42 FILES="ROADMAP.md CHANGELOG.md"
 sub-pr:
 	@bash scripts/substitute-pr-number.sh $(PR) $(FILES)
+
+# Report the clean terminal state — the /pipeline-cycle stop condition (v0.7.0).
+terminal-state:
+	@bash scripts/terminal-state.sh

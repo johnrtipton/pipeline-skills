@@ -2,7 +2,7 @@
 
 A development pipeline harness for Claude Code. Runs multi-stage pipelines (feature, bugfix, refactor, strategy) with enforced quality gates, PR reviews, and retrospectives. Ships as both:
 
-- **9 interactive skills** (`/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-strategy`, etc.) for use from a Claude Code chat — this is the primary interface
+- **10 interactive skills** (`/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-strategy`, `/pipeline-cycle`, etc.) for use from a Claude Code chat — this is the primary interface
 - **`pipeline.py` harness** for autonomous / headless runs against a project
 
 ## The Problem
@@ -28,6 +28,7 @@ Each skill is a single `SKILL.md` invoked by typing `/<skill-name>` in Claude Co
 | [`/pipeline-roadmap-audit`](skills/pipeline-roadmap-audit/SKILL.md) | Verifies every "not started" ROADMAP entry against the actual codebase. Catches stale entries where a feature shipped but the ROADMAP still claims it's pending | Before cutting a release candidate; after large consolidations |
 | [`/pipeline-strategy`](skills/pipeline-strategy/SKILL.md) | Planning-side analog of `/pipeline-run`. Surveys project state, brainstorms candidates from pluggable sources, triages, clusters, presents ≥2 distinct paths, recommends, captures the chosen path back into ROADMAP / ADRs / next-step | At milestone boundaries; auto-fired (light mode) after every `/pipeline-retro` |
 | [`/pipeline-drain`](skills/pipeline-drain/SKILL.md) | Drains open GitHub issues (optionally by label) into the current milestone, then runs `/pipeline-run --milestone --all` to process them all | Tech-debt sprint day; processing a backlog of retro-created issues |
+| [`/pipeline-cycle`](skills/pipeline-cycle/SKILL.md) | The outer loop — chains `strategy → run --all → retro` across milestones to a clean terminal state. Semi-autonomous by default (pauses at each strategy decision); `--auto` for full hands-off | Driving the whole plan→execute→close cadence instead of invoking each skill by hand |
 | [`/pipeline-shared`](skills/pipeline-shared/SKILL.md) | Shared stage procedures (env check, testing, security, docs, PR, review, merge, retro) referenced by the other pipeline skills. **Not invoked directly** | Internal — referenced by name from the other skills |
 
 ### How the skills chain
@@ -59,6 +60,10 @@ END OF MILESTONE:
 HYGIENE:
   /pipeline-roadmap-audit --milestone v0.5.0 # verify ROADMAP matches reality
   /pipeline-drain --label tech-debt          # batch-process open tech-debt issues
+
+DRIVE THE WHOLE LOOP (instead of the above by hand):
+  /pipeline-cycle                            # strategy→run --all→retro→… ; pauses at each strategy decision
+  /pipeline-cycle --auto                     # full hands-off until the terminal state is clean
 ```
 
 ## Quick Start
@@ -260,6 +265,7 @@ pipeline-skill/
     ├── pipeline-roadmap-audit/SKILL.md # Catch stale ROADMAP entries
     ├── pipeline-strategy/SKILL.md      # Plan the next milestone (≥2 paths, recommend, capture)
     ├── pipeline-drain/SKILL.md         # Batch-process open GitHub issues
+    ├── pipeline-cycle/SKILL.md         # Outer loop: strategy→run→retro to a clean terminal state
     └── pipeline-shared/SKILL.md        # Shared procedures (referenced, not invoked)
 ```
 

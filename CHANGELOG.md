@@ -6,10 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
-- `docs/adoption.md` — clone-to-first-PR adoption guide for using the family in
-  an external repo, linked from the README (v0.5.0 outward pivot).
+- `/pipeline-cycle` — the outer-loop orchestrator that chains
+  `strategy → run --all → retro` across milestones to a clean terminal state.
+  Semi-autonomous by default (pauses at each strategy decision per ADR-0003);
+  `--auto` for full hands-off. Plus `scripts/terminal-state.sh` + `make
+  terminal-state` (the stop condition: 0 issues + 0 active tasks + no Proposed
+  ADR + CI green). Indexed in README/CLAUDE.md/install.sh (v0.7.0).
+- `scripts/pipeline-gates.sh` — the pipeline quality gates as executable
+  functions (Gate 1-4 + pipeline-ship pre-merge), per ADR-0001 (#28).
+- `scripts/validate-templates.sh` + `make validate-templates` — validates every
+  state-file template parses and has the required stage shape (numeric,
+  strictly-ascending keys; name/status/verdict/checklist per stage). Wired into
+  `make check` (#33).
+- `.github/workflows/ci.yml` — CI runs `make check`, shell-script syntax checks,
+  and a pipeline.py parse on every PR and push, enforcing the gates automatically
+  (ADR-0001, #34).
+- `docs/adoption.md` — clone-to-first-PR adoption guide for an external repo (#47).
 - `docs/releasing.md` — release process; cut the first four tags (`v0.1.0`–`v0.4.0`)
-  retroactively at each milestone's retrospective commit (v0.5.0 outward pivot).
+  retroactively at each milestone's retro commit (#48).
 
 ### Fixed
 - `detect_default_branch` now resolves a `master`-default repo with no `origin`
@@ -27,18 +41,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   branch: the Code Review `subagent_prompt` in all four templates now restores
   HEAD on exit, and pipeline-run gains a worktree-restore reflex before any
   build/scp/ship that follows a subagent (#36).
-
-### Added
-- `scripts/pipeline-gates.sh` — the pipeline quality gates as executable
-  functions (Gate 1-4 + pipeline-ship pre-merge), per ADR-0001 (#28).
-- `scripts/validate-templates.sh` + `make validate-templates` — validates every
-  state-file template parses and has the required stage shape (numeric,
-  strictly-ascending keys; name/status/verdict/checklist per stage). Wired into
-  `make check`.
-- `.github/workflows/ci.yml` — CI runs `make check` (branch-literal guard +
-  template validator), shell-script syntax checks, and a pipeline.py parse on
-  every PR and push, enforcing the gates automatically (ADR-0001). Completes
-  v0.3.0 "Executable gates + CI".
 
 ## [v0.1.0]
 
