@@ -354,17 +354,36 @@ mkdir -p .pipeline-templates
 
 For each of `feature`, `bugfix`, `refactor` (plus `ship` only with `--with-ship`):
 
-1. **Copy** `$SRC/<type>-state.json` → `.pipeline-templates/<type>-state.json`
-   (skip if an identical file already exists — idempotent).
-2. **Substitute the detected branch.** The canonical templates set top-level
-   `"pr_target_branch": "main"` and reference `{pr_target_branch}` inside
-   checklist actions / subagent prompts (verified: only `{pr_target_branch}`
-   placeholders, no literal `origin/main`). Replace the top-level value with the
-   detected branch (and add a `default_branch` key for skills that read it):
+1. **PRESENCE-based idempotency — NEVER overwrite an existing project-local
+   template.** If `.pipeline-templates/<type>-state.json` already exists, **leave
+   it untouched and skip it** — it may carry intentional repo customizations
+   (extra stages, project-specific gates, edited prompts). Idempotency here is
+   keyed on *presence*, NOT byte-identity: a customized template is *supposed* to
+   differ from the canonical one, so an "overwrite-unless-identical" rule would
+   silently destroy exactly the work the project did. Only **create** templates
+   that are **absent**. (This matches Step 5's "only if absent" rule for
+   CHANGELOG/RETRO.) Re-copy an existing template ONLY under explicit
+   `--force-templates`, and back it up first.
+2. **Copy the canonical template + substitute the detected branch** — but only
+   for the templates that were absent in step 1 (the loop below re-checks
+   existence so it never touches a customized file). The canonical templates set
+   top-level `"pr_target_branch": "main"` and reference `{pr_target_branch}`
+   inside checklist actions / subagent prompts (verified: only `{pr_target_branch}`
+   placeholders, no literal `origin/main`). Copy, then replace the top-level value
+   with the detected branch (and add a `default_branch` key for skills that read
+   it):
 
    ```bash
    for t in feature bugfix refactor; do
      dst=".pipeline-templates/${t}-state.json"
+     # GUARD: never clobber an existing project-local template (it may be
+     # customized). Skip when present unless --force-templates was given.
+     if [ -f "$dst" ] && [ -z "$FORCE_TEMPLATES" ]; then
+       echo "skip $dst — already present; customizations preserved"
+       continue
+     fi
+     [ -f "$dst" ] && cp "$dst" "$dst.bak-$(date -u +%Y%m%dT%H%M%SZ)"  # --force-templates: back up first
+     cp "$SRC/${t}-state.json" "$dst"                                  # copy canonical (only when absent / forced)
      python3 - "$dst" "$DEFAULT_BRANCH" "$PR_TARGET" "$TEST" "$LINT_FMT" <<'PY'
 import json, sys
 dst, default_branch, pr_target, test_cmd, lint_fmt = sys.argv[1:6]
@@ -384,6 +403,12 @@ json.dump(d, open(dst, "w"), indent=2)
 PY
    done
    ```
+
+   > Because step 1's guard skips any template that already exists, a re-run on
+   > an initialized repo prints `skip … customizations preserved` for all three
+   > and writes nothing — the customized stages/gates are safe. The substitution
+   > also re-checks existence, so it can never re-inject duplicate command items
+   > into a file it didn't just create.
 
    - `$PR_TARGET` defaults to `$DEFAULT_BRANCH` unless `--pr-target` was given.
    - `$LINT_FMT` is the detected lint and/or format command (joined with `&&` if
@@ -699,7 +724,10 @@ pipeline-config block — and **no skill edit is needed**. The verification step
 - `--with-ship` → also COPY `$SRC/ship-state.json` (10 stages: Inventory Changes,
   Test Execution, Self-Review, Security Check, Documentation, Commit & PR, Code
   Review, Review Verdict, Merge PR, Retrospective) into `.pipeline-templates/`,
-  substituting `pr_target_branch` exactly as in Step 3. Do NOT hand-write it.
+  substituting `pr_target_branch` exactly as in Step 3 — and applying Step 3's
+  same **presence guard**: if `.pipeline-templates/ship-state.json` already exists,
+  leave it untouched (regenerate only under `--force-templates`, with a backup).
+  Do NOT hand-write it.
 
 ### 7. Verify (final step, both modes — see "How to verify")
 
@@ -722,12 +750,30 @@ pipeline-config block — and **no skill edit is needed**. The verification step
 - **`--priority-map <file>`** — explicit `feature→priority` overrides for
   migration (lines like `restore rust ↔ python parity: P0`).
 - **`--with-ship` / `--with-gates` / `--minimal`** — as above.
+- **`--force-templates`** — re-copy the canonical `<type>-state.json` over an
+  EXISTING `.pipeline-templates/<type>-state.json`, backing the old one up to
+  `<file>.bak-<UTC-timestamp>` first. Without this flag, existing templates are
+  left untouched (presence-based idempotency, Step 3) so repo customizations
+  survive a re-run. Use only when you deliberately want to discard local template
+  edits and regenerate from the current canonical shape.
 - **Idempotent + re-runnable** — every action is skip-if-already-correct.
   Re-running on a fully-initialized repo prints "already initialized — nothing to
   do" and exits 0. Re-running after partial init completes only the missing pieces.
+  **Existing project-local templates are NEVER overwritten on a re-run** (only
+  absent ones are created) — see Step 3 and the anti-pattern below.
 
 ## Anti-patterns to avoid
 
+- **Overwriting an existing `.pipeline-templates/<type>-state.json`** — a
+  project-local template is *meant* to diverge from the canonical one (extra
+  stages, project-specific gates, edited prompts). Idempotency for templates is
+  **presence-based, not byte-identity**: a "skip only if identical" guard destroys
+  exactly the customization the project added, because a customized file is by
+  definition not identical. Create only ABSENT templates; leave existing ones
+  untouched; regenerate from canonical ONLY under explicit `--force-templates`
+  (with a backup). Field case: djustlive's three templates each carry a
+  conditional microVM "Hardware/Build Validation" stage; an identity-keyed re-copy
+  would have silently dropped it.
 - **Hand-writing the state templates** — COPY the canonical ones and substitute
   detected values. feature=14 / bugfix=12 / refactor=12 / ship=10 stages with
   DIFFERENT structure (bugfix is Diagnosis/Fix/Regression Check with
