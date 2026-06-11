@@ -449,18 +449,22 @@ AGENT_BACKENDS = ("claude", "opencode")
 DEFAULT_AGENT = "claude"
 
 
-def build_agent_cmd(agent: str, prompt: str, max_turns: int,
+def build_agent_cmd(agent: str, prompt: str, project: str, max_turns: int,
                     model: str | None) -> list[str]:
     """Build the headless CLI invocation for the chosen agent backend.
 
     Backends differ in flag surface, so each is spelled out explicitly:
 
     - ``claude``   : ``claude -p PROMPT --output-format text --max-turns N``
-                     (Claude Code; ``-p`` takes the prompt, supports max-turns)
-    - ``opencode`` : ``opencode run PROMPT --format default``
+                     (Claude Code; ``-p`` takes the prompt, supports max-turns,
+                     honors the inherited process cwd)
+    - ``opencode`` : ``opencode run PROMPT --format default --dir PROJECT``
                      (OpenCode; prompt is positional, no ``-p`` / max-turns flag,
                      ``--dangerously-skip-permissions`` for unattended runs,
-                     ``-m provider/model`` for model selection)
+                     ``-m provider/model`` for model selection, and ``--dir`` to
+                     set the working directory — OpenCode does NOT honor the
+                     inherited process cwd, so file edits land in the wrong place
+                     without it)
     """
     if agent == "claude":
         cmd = ["claude", "-p", prompt,
@@ -473,9 +477,13 @@ def build_agent_cmd(agent: str, prompt: str, max_turns: int,
         # OpenCode's `run` takes the prompt positionally and has no max-turns
         # flag. --dangerously-skip-permissions is required for unattended runs
         # so file edits / shell calls aren't blocked waiting for approval.
+        # --dir is REQUIRED: OpenCode resolves its working directory from this
+        # flag, not from the process cwd that subprocess sets, so without it the
+        # agent edits files relative to wherever pipeline.py was launched.
         cmd = ["opencode", "run", prompt,
                "--format", "default",
-               "--dangerously-skip-permissions"]
+               "--dangerously-skip-permissions",
+               "--dir", os.path.abspath(project)]
         if model:
             cmd += ["-m", model]
         return cmd
@@ -487,7 +495,7 @@ def build_agent_cmd(agent: str, prompt: str, max_turns: int,
 def run_agent(prompt: str, project: str, agent: str = DEFAULT_AGENT,
               max_turns: int = 50, model: str | None = None) -> tuple[str, int]:
     """Run the configured agent backend with a prompt; return output + exit code."""
-    cmd = build_agent_cmd(agent, prompt, max_turns, model)
+    cmd = build_agent_cmd(agent, prompt, project, max_turns, model)
     label = {"claude": "Claude Code", "opencode": "OpenCode"}.get(agent, agent)
     print(f"\n{'─' * 60}")
     print(f"Running {label}...")
