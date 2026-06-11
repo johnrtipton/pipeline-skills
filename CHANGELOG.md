@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Pluggable agent backends — the harness can now drive **OpenCode** in addition
+  to Claude Code. New `--agent {claude,opencode}` / `--agent-model` flags,
+  `PIPELINE_AGENT` env var, and CLAUDE.md `pipeline_agent:` config (resolution
+  mirrors the profile chain). Per-backend CLI spelling lives in
+  `build_agent_cmd()`; the resolved backend + model persist in the state file so
+  `--resume` keeps the same agent. `run_claude()` → `run_agent()`. Backward
+  compatible: `claude` remains the default.
 - `/pipeline-cycle` — the outer-loop orchestrator that chains
   `strategy → run --all → retro` across milestones to a clean terminal state.
   Semi-autonomous by default (pauses at each strategy decision per ADR-0003);
