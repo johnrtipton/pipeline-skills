@@ -175,9 +175,23 @@ python pipeline.py --list --project ~/my-project
 python pipeline.py auto --project ~/my-project --milestone v1.0 --priority P0
 python pipeline.py auto --project ~/my-project --milestone v1.0 --all
 python pipeline.py auto --project ~/my-project --list --milestone v1.0
+
+# Drive the pipeline with OpenCode instead of Claude Code
+python pipeline.py feature --task "Add health check" --project ~/my-project --agent opencode
+python pipeline.py feature --task "Add health check" --project ~/my-project \
+    --agent opencode --agent-model anthropic/claude-sonnet-4-5
 ```
 
-No tests, no build step, no linter configured. This is a standalone Python 3.12+ script with no dependencies beyond the standard library. It shells out to `claude` CLI and `gh` CLI.
+No tests, no build step, no linter configured. This is a standalone Python 3.12+ script with no dependencies beyond the standard library. It shells out to an agent CLI and `gh` CLI.
+
+## Agent backends (pluggable)
+
+The harness is agent-agnostic: a backend just has to take a single prompt, run headlessly to completion, and emit the stage's verdict string to stdout. `build_agent_cmd()` in `pipeline.py` owns the per-backend CLI spelling; `AGENT_BACKENDS` lists what's supported.
+
+- **`claude`** (default) — `claude -p PROMPT --output-format text --max-turns N`
+- **`opencode`** — `opencode run PROMPT --format default --dangerously-skip-permissions --dir PROJECT` (prompt is positional, no max-turns flag; `--dangerously-skip-permissions` keeps unattended runs from blocking on edit/shell approvals; **`--dir` is required** — OpenCode resolves its working directory from this flag, *not* the process cwd `subprocess` sets, so without it edits land wherever `pipeline.py` was launched)
+
+**Backend selection** (first match wins, mirrors profile resolution): `--agent` CLI flag → `PIPELINE_AGENT` env var → CLAUDE.md `pipeline_agent:` config → `claude`. Pass `--agent-model` (or `-m`-style `provider/model` for OpenCode) to pin the model. The resolved backend + model are persisted in the state file so `--resume` keeps driving the same agent. Adding a new backend = one branch in `build_agent_cmd()` plus its name in `AGENT_BACKENDS`.
 
 ## Pipeline Types and Stage Counts
 

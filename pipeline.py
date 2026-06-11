@@ -80,6 +80,36 @@ def detect_profile(project: str) -> str:
     return "generic"
 
 
+def resolve_agent(project: str, agent_arg: str | None = None) -> str:
+    """Resolve which agent backend to drive the pipeline with.
+
+    Precedence (first match wins): ``--agent`` CLI flag -> ``PIPELINE_AGENT``
+    env var -> CLAUDE.md ``pipeline_agent:`` config -> ``DEFAULT_AGENT``.
+    Mirrors the profile-resolution chain so projects can pin a backend in
+    CLAUDE.md without passing the flag every run.
+    """
+    if agent_arg:
+        agent = agent_arg
+    elif os.environ.get("PIPELINE_AGENT"):
+        agent = os.environ["PIPELINE_AGENT"]
+    else:
+        agent = None
+        claude_md = Path(project) / "CLAUDE.md"
+        if claude_md.exists():
+            m = re.search(r"^\s*-?\s*pipeline_agent:\s*(\S+)", claude_md.read_text(),
+                          re.MULTILINE)
+            if m:
+                agent = m.group(1)
+        if not agent:
+            agent = DEFAULT_AGENT
+
+    if agent not in AGENT_BACKENDS:
+        print(f"Error: unknown agent backend {agent!r} "
+              f"(supported: {', '.join(AGENT_BACKENDS)})")
+        sys.exit(1)
+    return agent
+
+
 def detect_default_branch(project: str) -> str:
     """Resolve the repo's default branch — mirrors the pipeline-* skills' chain.
 
@@ -274,7 +304,8 @@ def load_template(pipeline_type: str, project: str | None = None) -> dict:
 
 
 def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
-               profile_name: str | None = None) -> dict:
+               profile_name: str | None = None, agent: str | None = None,
+               agent_model: str | None = None) -> dict:
     """Create a new state file from template, applying profile and project overrides."""
     project = os.path.abspath(project)
     state = load_template(pipeline_type, project)
@@ -286,6 +317,10 @@ def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
     state["pr_target_branch"] = target_branch
     state["project_path"] = project
     state["started_at"] = datetime.now(timezone.utc).isoformat()
+    # Persist the agent backend so --resume keeps driving the same one.
+    state["agent"] = resolve_agent(project, agent)
+    if agent_model:
+        state["agent_model"] = agent_model
 
     # Load and apply profile
     if not profile_name:
@@ -407,16 +442,63 @@ def build_stage_prompt(state: dict, stage_num: str, stage: dict) -> str:
     return "\n".join(lines)
 
 
-def run_claude(prompt: str, project: str, max_turns: int = 50) -> tuple[str, int]:
-    """Run Claude Code with a prompt and return output + exit code."""
-    cmd = [
-        "claude",
-        "-p", prompt,
-        "--output-format", "text",
-        "--max-turns", str(max_turns),
-    ]
+# Supported agent backends. The harness is CLI-driven and otherwise
+# agent-agnostic: each backend just needs to take a single prompt, run
+# headlessly to completion, and emit the stage's verdict string to stdout.
+AGENT_BACKENDS = ("claude", "opencode")
+DEFAULT_AGENT = "claude"
+
+
+def build_agent_cmd(agent: str, prompt: str, project: str, max_turns: int,
+                    model: str | None) -> list[str]:
+    """Build the headless CLI invocation for the chosen agent backend.
+
+    Backends differ in flag surface, so each is spelled out explicitly:
+
+    - ``claude``   : ``claude -p PROMPT --output-format text --max-turns N``
+                     (Claude Code; ``-p`` takes the prompt, supports max-turns,
+                     honors the inherited process cwd)
+    - ``opencode`` : ``opencode run PROMPT --format default --dir PROJECT``
+                     (OpenCode; prompt is positional, no ``-p`` / max-turns flag,
+                     ``--dangerously-skip-permissions`` for unattended runs,
+                     ``-m provider/model`` for model selection, and ``--dir`` to
+                     set the working directory — OpenCode does NOT honor the
+                     inherited process cwd, so file edits land in the wrong place
+                     without it)
+    """
+    if agent == "claude":
+        cmd = ["claude", "-p", prompt,
+               "--output-format", "text",
+               "--max-turns", str(max_turns)]
+        if model:
+            cmd += ["--model", model]
+        return cmd
+    if agent == "opencode":
+        # OpenCode's `run` takes the prompt positionally and has no max-turns
+        # flag. --dangerously-skip-permissions is required for unattended runs
+        # so file edits / shell calls aren't blocked waiting for approval.
+        # --dir is REQUIRED: OpenCode resolves its working directory from this
+        # flag, not from the process cwd that subprocess sets, so without it the
+        # agent edits files relative to wherever pipeline.py was launched.
+        cmd = ["opencode", "run", prompt,
+               "--format", "default",
+               "--dangerously-skip-permissions",
+               "--dir", os.path.abspath(project)]
+        if model:
+            cmd += ["-m", model]
+        return cmd
+    raise ValueError(
+        f"Unknown agent backend: {agent!r} (supported: {', '.join(AGENT_BACKENDS)})"
+    )
+
+
+def run_agent(prompt: str, project: str, agent: str = DEFAULT_AGENT,
+              max_turns: int = 50, model: str | None = None) -> tuple[str, int]:
+    """Run the configured agent backend with a prompt; return output + exit code."""
+    cmd = build_agent_cmd(agent, prompt, project, max_turns, model)
+    label = {"claude": "Claude Code", "opencode": "OpenCode"}.get(agent, agent)
     print(f"\n{'─' * 60}")
-    print(f"Running Claude Code...")
+    print(f"Running {label}...")
     print(f"{'─' * 60}\n")
     result = subprocess.run(
         cmd,
@@ -555,7 +637,11 @@ def run_pipeline(state: dict):
 
         # Build and run
         prompt = build_stage_prompt(state, stage_num, stage)
-        output, exit_code = run_claude(prompt, state["project_path"])
+        output, exit_code = run_agent(
+            prompt, state["project_path"],
+            agent=state.get("agent", DEFAULT_AGENT),
+            model=state.get("agent_model"),
+        )
 
         # Extract verdict
         verdict = extract_verdict(output, stage)
@@ -846,7 +932,8 @@ def is_task_done(project: str, task: dict) -> tuple[bool, str]:
 
 def run_auto(project: str, roadmap: str | None, milestone: str | None,
              priority: str | None, feature: str | None, process_all: bool,
-             list_only: bool):
+             list_only: bool, agent: str | None = None,
+             agent_model: str | None = None):
     """Parse ROADMAP and process tasks through pipelines."""
     project = os.path.abspath(project)
 
@@ -927,7 +1014,8 @@ def run_auto(project: str, roadmap: str | None, milestone: str | None,
                 continue
 
         # New pipeline
-        state = init_state(pipeline_type, task_desc, project, target_branch)
+        state = init_state(pipeline_type, task_desc, project, target_branch,
+                           agent=agent, agent_model=agent_model)
         # Override branch name to include issue number if present
         if task.get("issue"):
             state["branch_name"] = f"{prefix}/{slugify(task['name'])}-{task['issue']}"
@@ -992,6 +1080,13 @@ Examples:
     parser.add_argument("--roadmap", help="Path to ROADMAP.md (auto-detected if not specified)")
     # Profile options
     parser.add_argument("--profile", help="Pipeline profile (generic/django/... or auto-detect)")
+    # Agent backend options
+    parser.add_argument("--agent", "-a", choices=AGENT_BACKENDS,
+                        help="Agent backend to drive the pipeline "
+                             "(default: PIPELINE_AGENT env / CLAUDE.md pipeline_agent / claude)")
+    parser.add_argument("--agent-model",
+                        help="Model passed to the agent backend "
+                             "(e.g. opencode 'anthropic/claude-sonnet-4-5')")
 
     args = parser.parse_args()
 
@@ -1005,6 +1100,8 @@ Examples:
             feature=args.feature,
             process_all=args.process_all,
             list_only=args.list,
+            agent=args.agent,
+            agent_model=args.agent_model,
         )
         return
 
@@ -1049,7 +1146,8 @@ Examples:
         parser.error(f"Unknown pipeline type: {args.type}")
 
     state = init_state(args.type, args.task, args.project, args.target_branch,
-                       profile_name=args.profile)
+                       profile_name=args.profile, agent=args.agent,
+                       agent_model=args.agent_model)
 
     # Check if state file already exists (duplicate)
     existing = state_path(state["project_path"], state["branch_name"])
@@ -1062,6 +1160,8 @@ Examples:
     print(f"Task: {args.task}")
     print(f"Branch: {state['branch_name']}")
     print(f"Target: {args.target_branch}")
+    print(f"Agent: {state.get('agent', DEFAULT_AGENT)}"
+          + (f" ({state['agent_model']})" if state.get('agent_model') else ""))
 
     run_pipeline(state)
 
