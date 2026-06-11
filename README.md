@@ -86,6 +86,17 @@ cd ~/pipeline-skill
 
 > Adopting the family in **your own repo**? See the step-by-step [adoption guide](docs/adoption.md) (clone → first shipped PR).
 
+### OpenCode (alternative to Claude Code)
+
+The same skills work with [OpenCode](https://opencode.ai) — an open-source terminal AI coding agent:
+
+```bash
+./install-opencode.sh              # install commands + skill files
+./install-opencode.sh --with-usai  # also configure USAi API provider
+```
+
+Then in OpenCode: `/pipeline-init`, `/pipeline-run`, `/pipeline-ship` — same commands, same behavior. See the full [OpenCode setup guide](docs/opencode-setup.md).
+
 ### Also supported: autonomous `pipeline.py` harness
 
 For headless / CI / cron runs, there's a `pipeline.py` external harness. Most developers won't need this — the interactive skills are the primary interface. Skip to [`pipeline.py` details](#pipelinepy-autonomous-harness-advanced) below if you have a reason to run the pipeline without a human in the chat.
