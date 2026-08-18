@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The lifecycle the pipeline-skill harness implements: twelve stages, two human gates, and the canon ratchet that turns each surviving failure into a rule the next PR cannot bypass.">
+<meta property="og:title" content="The two-gate lifecycle">
+<meta property="og:description" content="The lifecycle the pipeline-skill harness implements: twelve stages, two human gates, and the canon ratchet that turns each surviving failure into a rule the next PR cannot bypass.">
+<meta property="og:type" content="article">
+<title>Two-Gate Lifecycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --ground:     #F5F6F8;
+    --surface:    #FFFFFF;
+    --ink:        #161A20;
+    --muted:      #5A6472;
+    --faint:      #828C9B;
+    --rule:       #DEE3E9;
+    --steel:      #2F6E8F;
+    --steel-bg:   #E7F0F6;
+    --steel-line: #B7D0DF;
+    --amber:      #A96209;
+    --amber-bg:   #FAEDD8;
+
+    --f-display: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --f-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:     #12151A;
+      --surface:    #181C23;
+      --ink:        #E5E9EF;
+      --muted:      #A0AAB9;
+      --faint:      #7C8797;
+      --rule:       #272D37;
+      --steel:      #6FB8DA;
+      --steel-bg:   #17262F;
+      --steel-line: #2E4B5C;
+      --amber:      #E7A648;
+      --amber-bg:   #2B2115;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:     #12151A;
+    --surface:    #181C23;
+    --ink:        #E5E9EF;
+    --muted:      #A0AAB9;
+    --faint:      #7C8797;
+    --rule:       #272D37;
+    --steel:      #6FB8DA;
+    --steel-bg:   #17262F;
+    --steel-line: #2E4B5C;
+    --amber:      #E7A648;
+    --amber-bg:   #2B2115;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.1rem, 4vw, 3rem) 4.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(3.25rem, 7vw, 5rem);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 1.15rem; }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(2.3rem, 6vw, 3.4rem);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .deck {
+    font-size: clamp(1.06rem, 2.2vw, 1.2rem);
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 58ch;
+    margin: 0;
+  }
+  .deck strong { color: var(--ink); font-weight: 600; }
+
+  .sourced {
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    line-height: 1.9;
+    color: var(--faint);
+    border-top: 1px solid var(--rule);
+    padding-top: 1rem;
+    margin-top: 0.35rem;
+    max-width: 72ch;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.75rem; }
+
+  h2 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.55rem;
+    letter-spacing: -0.02em;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+  }
+  h2::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+
+  p { margin: 0; }
+
+  /* ---------- diagram ---------- */
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 1.4rem; }
+
+  .plate {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.5rem 1.25rem;
+  }
+  .flow { display: block; width: 100%; min-width: 620px; height: auto; }
+
+  .n-box   { fill: var(--steel-bg); stroke: var(--steel-line); stroke-width: 1; }
+  .n-ctx   { fill: var(--surface); stroke: var(--rule); stroke-width: 1; stroke-dasharray: 4 3; }
+  .n-gate  { fill: var(--amber-bg); stroke: var(--amber); stroke-width: 1.5; }
+  .n-term  { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+  .n-stop  { fill: var(--ink); stroke: none; }
+
+  .edge     { stroke: var(--steel); stroke-width: 1.4; fill: none; }
+  .edge-r   { stroke: var(--faint); stroke-width: 1.2; fill: none; }
+  .edge-far { stroke: var(--faint); stroke-width: 1.1; stroke-dasharray: 3 4; fill: none; }
+  .edge-a   { stroke: var(--amber); stroke-width: 1.3; stroke-dasharray: 4 3; fill: none; }
+  .mk       { fill: var(--steel); }
+  .mk-r     { fill: var(--faint); }
+
+  .t-num   { font-family: var(--f-mono); font-size: 12px; font-weight: 600; fill: var(--steel); }
+  .t-name  { font-family: var(--f-display); font-size: 13.5px; font-weight: 600; fill: var(--ink); letter-spacing: 0.02em; }
+  .t-sub   { font-family: var(--f-mono); font-size: 10.5px; fill: var(--muted); }
+  .t-gate  { font-family: var(--f-mono); font-size: 11px; font-weight: 600; fill: var(--amber); letter-spacing: 0.09em; }
+  .t-edge  { font-family: var(--f-mono); font-size: 9.5px; fill: var(--faint); letter-spacing: 0.09em; }
+  .t-stop  { font-family: var(--f-mono); font-size: 11px; font-weight: 600; fill: var(--ground); letter-spacing: 0.11em; }
+
+  figcaption { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.6rem;
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .key { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .sw { width: 0.9rem; height: 0.9rem; border-radius: 2px; display: inline-block; }
+  .sw-machine { background: var(--steel-bg); border: 1px solid var(--steel-line); }
+  .sw-human   { background: var(--amber-bg); border: 1.5px solid var(--amber); }
+  .sw-ctx     { background: var(--surface); border: 1px dashed var(--rule); }
+
+  .note { font-size: 0.94rem; line-height: 1.65; color: var(--muted); max-width: 44rem; }
+
+  details { border-top: 1px solid var(--rule); padding-top: 0.9rem; }
+  summary {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--faint);
+    cursor: pointer;
+  }
+  summary:focus-visible { outline: 2px solid var(--steel); outline-offset: 3px; }
+  details pre {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    line-height: 1.75;
+    color: var(--muted);
+    overflow-x: auto;
+    margin: 0.9rem 0 0;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+  }
+
+  /* ---------- stage list ---------- */
+
+  .stages { display: flex; flex-direction: column; }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 3.25rem 1fr;
+    gap: 0 1.25rem;
+    padding: 1.9rem 0;
+    border-top: 1px solid var(--rule);
+  }
+  .stage:first-child { border-top: none; padding-top: 0.25rem; }
+  .stage:last-child { border-bottom: 1px solid var(--rule); }
+
+  .num {
+    font-family: var(--f-mono);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--steel);
+    padding-top: 0.3rem;
+  }
+  .stage[data-role="human"] .num { color: var(--amber); }
+  .stage[data-role="context"] .num { color: var(--faint); }
+
+  .stage-body { display: flex; flex-direction: column; gap: 1rem; min-width: 0; max-width: 44rem; }
+
+  .stage h3 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.16rem;
+    letter-spacing: -0.012em;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.7rem;
+  }
+  .skill {
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: -0.01em;
+  }
+
+  .lbl {
+    font-family: var(--f-mono);
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--faint);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+
+  .artifact { font-size: 0.95rem; line-height: 1.6; }
+  .artifact .out { font-family: var(--f-mono); font-size: 0.82rem; color: var(--steel); }
+
+  .split {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1.2rem 2rem;
+    padding: 1.05rem 0;
+    border-top: 1px dotted var(--rule);
+    border-bottom: 1px dotted var(--rule);
+  }
+  .split p { font-size: 0.93rem; line-height: 1.6; color: var(--muted); }
+  .split .ai .lbl { color: var(--steel); }
+  .split .hu .lbl { color: var(--amber); }
+
+  .gate { font-size: 0.93rem; line-height: 1.65; color: var(--muted); }
+  .gate .lbl { display: inline; margin-right: 0.5rem; margin-bottom: 0; }
+  .stage[data-role="human"] .gate {
+    color: var(--ink);
+    background: var(--amber-bg);
+    border-left: 2px solid var(--amber);
+    padding: 0.8rem 1rem;
+  }
+  .stage[data-role="human"] .gate .lbl { color: var(--amber); }
+
+  .field { font-size: 0.9rem; line-height: 1.6; color: var(--muted); }
+  .field .lbl { display: inline; margin-right: 0.5rem; margin-bottom: 0; color: var(--steel); }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.82em;
+    background: var(--steel-bg);
+    color: var(--steel);
+    padding: 0.1em 0.3em;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  /* ---------- ratchet + layers ---------- */
+
+  .n-chip      { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+  .n-step      { fill: var(--steel-bg); stroke: var(--steel-line); stroke-width: 1; }
+  .n-step-hard { fill: var(--steel-bg); stroke: var(--steel); stroke-width: 2; }
+  .n-dec       { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+
+  .layers { display: flex; flex-direction: column; }
+  .layer {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 11rem) minmax(0, 1fr);
+    gap: 0.35rem 1.5rem;
+    padding: 1.1rem 0;
+    border-top: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .layer:last-child { border-bottom: 1px solid var(--rule); }
+  .layer .lnum {
+    font-family: var(--f-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--steel);
+    font-variant-numeric: tabular-nums;
+  }
+  .layer h3 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 0.98rem;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .layer p { font-size: 0.93rem; line-height: 1.6; color: var(--muted); }
+
+  .pull {
+    border-left: 2px solid var(--rule);
+    padding: 0.2rem 0 0.2rem 1.2rem;
+    font-size: 1.04rem;
+    line-height: 1.6;
+    max-width: 44rem;
+    color: var(--ink);
+  }
+  .pull strong { font-weight: 600; }
+
+  /* ---------- scale panel ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1.75rem 2rem;
+    border-bottom: 1px solid var(--rule);
+    padding: 0 0 1.75rem;
+  }
+  .stat { display: flex; flex-direction: column; gap: 0.4rem; }
+  .stat .fig {
+    font-family: var(--f-display);
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .stat .cap {
+    font-family: var(--f-mono);
+    font-size: 0.67rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    line-height: 1.55;
+    color: var(--faint);
+  }
+  .findings { display: flex; flex-direction: column; gap: 1.1rem; max-width: 44rem; }
+  .findings p { font-size: 0.97rem; line-height: 1.65; color: var(--muted); }
+  .findings strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- spanning concerns ---------- */
+
+  .spans { display: flex; flex-direction: column; gap: 2rem; }
+
+  .span-item {
+    display: grid;
+    grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+    gap: 0.6rem 1.75rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--rule);
+  }
+  .span-item h3 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+    margin: 0;
+    align-self: start;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .span-item .col { display: flex; flex-direction: column; gap: 0.8rem; }
+  .span-item p { font-size: 0.97rem; line-height: 1.65; color: var(--muted); }
+  .span-item strong { color: var(--ink); font-weight: 600; }
+
+  .chip {
+    font-family: var(--f-mono);
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    border-radius: 2px;
+    padding: 0.12rem 0.38rem;
+  }
+
+  /* ---------- closing ---------- */
+
+  .close {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+  .close p { font-size: 1.04rem; line-height: 1.65; max-width: 44rem; }
+  .close strong { font-weight: 600; }
+
+  footer {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    color: var(--faint);
+    border-top: 1px solid var(--rule);
+    padding-top: 1.2rem;
+  }
+
+  @media (max-width: 34rem) {
+    .stage { grid-template-columns: 1fr; gap: 0.6rem; }
+    .num { padding-top: 0; }
+    .span-item { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+  <style>
+    /* Standalone reset — the Artifact runtime normally supplies this. */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; }
+    img, svg { max-width: 100%; }
+    a { color: inherit; }
+    footer { display: flex; flex-direction: column; gap: 0.4rem; }
+    footer a { color: var(--steel); text-decoration: none; border-bottom: 1px solid transparent; }
+    footer a:hover { border-bottom-color: var(--steel); }
+    footer a:focus-visible { outline: 2px solid var(--steel); outline-offset: 3px; }
+  </style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Working model · pipeline-skill · checked against a consumer repo</div>
+    <h1>The two-gate lifecycle</h1>
+    <p class="deck">Twelve stages from domain fact to published release. <strong>Two of them stop for a human</strong> — choose the path, triage a failure. The rest is a ratchet: <strong>every failure it survives becomes a mandatory checklist item</strong>, and every repo it lands in reshapes it on arrival.</p>
+    <p class="sourced">Read from: pipeline.py · 11 skills · 6 state templates · CANON.md · ADR-0001/0002/0003 · scripts/*.sh · CI · ROADMAP.md · RETRO.md — then checked against a consumer repo that has run the harness ~440 times: 647 state files · 390 PR retros · 330 tracker rows · 30+ pre-push hooks · 13 CI workflows.</p>
+  </header>
+
+  <section>
+    <h2>The loop</h2>
+    <figure>
+      <div class="plate">
+        <svg class="flow" viewBox="0 0 900 946" role="img" aria-label="Flowchart of the twelve-stage pipeline loop. Human gate one sits after Plan; human gate two spans Verify, Review and Merge. The usual return path from the terminal check goes back to Select for the next drain bucket; a rarer dashed path returns to Plan at release-line boundaries.">
+          <defs>
+            <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path class="mk" d="M0 0 L8 4 L0 8 Z"></path>
+            </marker>
+            <marker id="ar-r" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path class="mk-r" d="M0 0 L8 4 L0 8 Z"></path>
+            </marker>
+          </defs>
+
+          <!-- 0 GROUND -->
+          <rect class="n-ctx" x="150" y="16" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="44">00</text>
+          <text class="t-name" x="204" y="35">GROUND</text>
+          <text class="t-sub" x="204" y="50">KB · specs · domain facts</text>
+          <line class="edge" x1="370" y1="60" x2="370" y2="76" marker-end="url(#ar)"></line>
+
+          <!-- 1 PLAN -->
+          <rect class="n-box" x="150" y="78" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="106">01</text>
+          <text class="t-name" x="204" y="97">PLAN</text>
+          <text class="t-sub" x="204" y="112">/pipeline-strategy → session doc · ADR · ROADMAP</text>
+          <text class="t-edge" x="606" y="104">RARE · RELEASE-LINE ONLY</text>
+          <line class="edge" x1="370" y1="122" x2="370" y2="138" marker-end="url(#ar)"></line>
+
+          <!-- GATE 1 -->
+          <rect class="n-gate" x="150" y="140" width="440" height="40" rx="3"></rect>
+          <text class="t-gate" x="166" y="158">HUMAN GATE ①</text>
+          <text class="t-sub" x="166" y="173">pick one of ≥2 paths · strategy stage 7 · the only default pause</text>
+          <line class="edge" x1="370" y1="180" x2="370" y2="196" marker-end="url(#ar)"></line>
+
+          <!-- 2 SELECT -->
+          <rect class="n-box" x="150" y="198" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="226">02</text>
+          <text class="t-name" x="204" y="217">SELECT</text>
+          <text class="t-sub" x="204" y="232">/pipeline-next → state file = the program</text>
+          <line class="edge" x1="370" y1="242" x2="370" y2="258" marker-end="url(#ar)"></line>
+
+          <!-- 3 BUILD -->
+          <rect class="n-box" x="150" y="260" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="288">03</text>
+          <text class="t-name" x="204" y="279">BUILD</text>
+          <text class="t-sub" x="204" y="294">impl commit · CHANGELOG untouched</text>
+          <line class="edge" x1="370" y1="304" x2="370" y2="320" marker-end="url(#ar)"></line>
+
+          <!-- 4 VERIFY -->
+          <rect class="n-box" x="150" y="322" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="350">04</text>
+          <text class="t-name" x="204" y="341">VERIFY</text>
+          <text class="t-sub" x="204" y="356">tests · self-review · security → verdicts</text>
+          <line class="edge" x1="370" y1="366" x2="370" y2="382" marker-end="url(#ar)"></line>
+
+          <!-- 5 SHIP -->
+          <rect class="n-box" x="150" y="384" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="412">05</text>
+          <text class="t-name" x="204" y="403">SHIP</text>
+          <text class="t-sub" x="204" y="418">docs + CHANGELOG commit · pull request</text>
+          <line class="edge" x1="370" y1="428" x2="370" y2="444" marker-end="url(#ar)"></line>
+
+          <!-- 6 REVIEW -->
+          <rect class="n-box" x="150" y="446" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="474">06</text>
+          <text class="t-name" x="204" y="465">REVIEW</text>
+          <text class="t-sub" x="204" y="480">fresh subagent · no build context</text>
+          <line class="edge" x1="370" y1="490" x2="370" y2="506" marker-end="url(#ar)"></line>
+
+          <!-- 7 MERGE -->
+          <rect class="n-box" x="150" y="508" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="536">07</text>
+          <text class="t-name" x="204" y="527">MERGE</text>
+          <text class="t-sub" x="204" y="542">squash · CI green · onto the release line</text>
+          <line class="edge" x1="370" y1="552" x2="370" y2="568" marker-end="url(#ar)"></line>
+
+          <!-- 8 LEARN -->
+          <rect class="n-box" x="150" y="570" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="598">08</text>
+          <text class="t-name" x="204" y="589">LEARN</text>
+          <text class="t-sub" x="204" y="604">per-PR retro · tech-debt issues</text>
+          <line class="edge" x1="370" y1="614" x2="370" y2="630" marker-end="url(#ar)"></line>
+
+          <!-- 9 CLOSE -->
+          <rect class="n-box" x="150" y="632" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="660">09</text>
+          <text class="t-name" x="204" y="651">CLOSE</text>
+          <text class="t-sub" x="204" y="666">bucket retro · Action Tracker · new issues</text>
+          <line class="edge" x1="370" y1="676" x2="370" y2="692" marker-end="url(#ar)"></line>
+
+          <!-- 10 RELEASE -->
+          <rect class="n-box" x="150" y="694" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="722">10</text>
+          <text class="t-name" x="204" y="713">RELEASE</text>
+          <text class="t-sub" x="204" y="728">version bump · tag · pre-release audit · publish</text>
+          <line class="edge" x1="370" y1="738" x2="370" y2="754" marker-end="url(#ar)"></line>
+
+          <!-- 11 OPERATE -->
+          <rect class="n-box" x="150" y="756" width="440" height="44" rx="3"></rect>
+          <text class="t-num" x="166" y="784">11</text>
+          <text class="t-name" x="204" y="775">OPERATE / DRAIN</text>
+          <text class="t-sub" x="204" y="790">incidents · inbound bugs · drain-bucket assembly</text>
+          <line class="edge" x1="370" y1="800" x2="370" y2="816" marker-end="url(#ar)"></line>
+
+          <!-- TERMINAL CHECK -->
+          <rect class="n-term" x="150" y="818" width="440" height="46" rx="23"></rect>
+          <text class="t-name" x="204" y="839">TERMINAL CHECK</text>
+          <text class="t-sub" x="204" y="854">0 issues · 0 tasks · no Proposed ADR · CI green</text>
+          <line class="edge" x1="370" y1="864" x2="370" y2="880" marker-end="url(#ar)"></line>
+          <text class="t-edge" x="382" y="877">CLEAN</text>
+
+          <!-- STOP -->
+          <rect class="n-stop" x="300" y="882" width="140" height="34" rx="3"></rect>
+          <text class="t-stop" x="370" y="904" text-anchor="middle">COMPLETE</text>
+
+          <!-- return: REQUEST_CHANGES (6 -> 3) -->
+          <path class="edge-r" d="M150 468 H124 V282 H150" marker-end="url(#ar-r)"></path>
+          <text class="t-edge" x="116" y="375" text-anchor="middle" transform="rotate(-90 116 375)">REQUEST_CHANGES</text>
+
+          <!-- return: next drain bucket (terminal -> 2) — the usual path -->
+          <path class="edge-r" d="M150 832 H96 V220 H150" marker-end="url(#ar-r)"></path>
+          <text class="t-edge" x="88" y="500" text-anchor="middle" transform="rotate(-90 88 500)">NEXT DRAIN BUCKET · USUAL</text>
+
+          <!-- return: re-plan at a release line (terminal -> 1) — the rare path -->
+          <path class="edge-far" d="M150 852 H68 V100 H150" marker-end="url(#ar-r)"></path>
+          <text class="t-edge" x="60" y="500" text-anchor="middle" transform="rotate(-90 60 500)">RE-PLAN · RELEASE LINE · RARE</text>
+
+          <!-- GATE 2 bracket over 4 / 6 / 7 -->
+          <path class="edge-a" d="M590 344 H618"></path>
+          <path class="edge-a" d="M590 468 H618"></path>
+          <path class="edge-a" d="M590 530 H618"></path>
+          <path class="edge-a" d="M618 344 V530"></path>
+          <path class="edge-a" d="M618 437 H636"></path>
+          <rect class="n-gate" x="636" y="406" width="244" height="62" rx="3"></rect>
+          <text class="t-gate" x="652" y="425">HUMAN GATE ②</text>
+          <text class="t-sub" x="652" y="440">any FAILED verdict halts</text>
+          <text class="t-sub" x="652" y="455">the run — triage, --resume</text>
+        </svg>
+      </div>
+      <figcaption>
+        <div class="legend">
+          <span class="key"><span class="sw sw-machine"></span> machine-gated stage</span>
+          <span class="key"><span class="sw sw-human"></span> human gate</span>
+          <span class="key"><span class="sw sw-ctx"></span> standing context</span>
+          <span class="key">grey = return path</span>
+        </div>
+        <p class="note">Stages 02–09 run many times per lap — several PRs per drain bucket, often concurrently in separate git worktrees. Not drawn, to keep the spine legible: retro findings from stages 8 and 9 feed back into <strong>Ground</strong> (KB patches) and into the <strong>canon ladder</strong>, which re-enters at Build as a new gate or checklist item.</p>
+        <details>
+          <summary>Mermaid source</summary>
+<pre>flowchart TD
+    KB["0 · GROUND"] --> P["1 · PLAN — /pipeline-strategy"]
+    P --> G1{{"HUMAN GATE ① — pick one of ≥2 paths"}}
+    G1 --> S["2 · SELECT — /pipeline-next"]
+    S --> B["3 · BUILD"]
+    B --> V["4 · VERIFY"]
+    V --> SH["5 · SHIP"]
+    SH --> R["6 · REVIEW — fresh subagent"]
+    R --> |REQUEST_CHANGES| B
+    R --> M["7 · MERGE"]
+    M --> L["8 · LEARN — per-PR retro"]
+    L --> C["9 · CLOSE — bucket retro + tracker"]
+    C --> REL["10 · RELEASE — tag + publish"]
+    REL --> O["11 · OPERATE / DRAIN"]
+    O --> T{"terminal-state.sh"}
+    T --> |next drain bucket| S
+    T --> |release line| P
+    T --> |clean| DONE(["COMPLETE"])
+    V -.-> |FAILED| G2{{"HUMAN GATE ② — triage, --resume"}}
+    R -.-> G2
+    M -.-> |CI red| G2
+    G2 -.-> B
+    L -.-> KB
+    C -.-> CANON["CANON LADDER"] -.-> B</pre>
+        </details>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Stage by stage</h2>
+
+    <div class="stages">
+
+      <article class="stage" data-role="context">
+        <div class="num">00</div>
+        <div class="stage-body">
+          <h3>Ground</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> KB / domain facts / <span class="out">CLAUDE.md</span> canon</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Drafts and patches the KB from RFPs and from the "KB Updates Needed" section of every retro.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Supplies source material; settles domain disputes.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> None — standing context, not a stage you pass.</p>
+          <p class="field"><span class="lbl">At scale</span> The harness ships nothing for this; the consumer built it anyway — <code>docs/ai/</code> (9 AI-facing domain docs), <code>llms.txt</code>, <code>BEST_PRACTICES_AI.md</code>, <code>docs/conventions/</code>. Evidence the leg is load-bearing, not optional.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="human">
+        <div class="num">01</div>
+        <div class="stage-body">
+          <h3>Plan <span class="skill">/pipeline-strategy</span></h3>
+          <p class="artifact"><span class="lbl">Artifact</span> <span class="out">docs/strategy-sessions/*.md</span>, an ADR if directional, ROADMAP rows</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>The whole 8-stage strategy pipeline: survey → brainstorm → triage → cluster → present ≥2 paths → recommend.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Reads the paths and picks one.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate ①</span> <strong>The real one.</strong> Stage 7 refuses to capture until a path is chosen; ADR-0003 makes this the only place <code>/pipeline-cycle</code> pauses by default. <code>--auto</code> removes it — exactly the right thing to make opt-in.</p>
+          <p class="field"><span class="lbl">At scale</span> Rarer than the design implies: <strong>4 strategy sessions across ~440 runs</strong>, all at release-line boundaries (v1.0.0-readiness, v1.1-readiness). Formal planning is an event, not a cadence.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">02</div>
+        <div class="stage-body">
+          <h3>Select <span class="skill">/pipeline-next</span></h3>
+          <p class="artifact"><span class="lbl">Artifact</span> <span class="out">.pipeline-state/&lt;branch&gt;.json</span> — the program counter</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Parses ROADMAP, filters by milestone and priority, batches related tasks, instantiates the template.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Nothing.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> Inherited from ①.</p>
+          <p class="field"><span class="lbl">At scale</span> The type system got extended locally — beyond feature (172) and bugfix (168) came <code>investigation</code>, <code>milestone-retro</code>, <code>review-existing-pr</code>, <code>chore</code>, <code>docs</code>. Plus per-run sidecars the harness never specified: <span class="out">&lt;run&gt;-plan.md</span> and <span class="out">&lt;run&gt;-changes.txt</span>.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">03</div>
+        <div class="stage-body">
+          <h3>Build</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> implementation commit on a branch, CHANGELOG untouched</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>All of it — often several agents at once, each in its own git worktree.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Nothing.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> Machine only — mandatory checklist ticks plus <code>gate_changelog_boundary</code>. That gate exists because two implementer agents once ran concurrently on one checkout and both edited <code>[Unreleased]</code>.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="human">
+        <div class="num">04</div>
+        <div class="stage-body">
+          <h3>Verify</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> <span class="out">TESTS_PASSED</span> / <span class="out">SECURITY_PASSED</span> verdicts, self-review notes</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Runs tests, the enumerated-unit inventory, and the profile's security patterns.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Nothing unless it fails.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate ②</span> Verdict extraction: FAILED overrides PASSED and halts the pipeline for <code>--resume</code>. The only unplanned way a human gets pulled in — and it fires from Verify, Review, or a red CI alike.</p>
+          <p class="field"><span class="lbl">At scale</span> Self-Review is where canon accretes fastest: <strong>9 mandatory items of 15</strong>, up from 5 in the stock template. Each addition names its incident — including a mechanical scan for private downstream-app names after one nearly shipped in a commit subject.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">05</div>
+        <div class="stage-body">
+          <h3>Ship</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> docs + CHANGELOG commit, pull request</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Writes both commits and opens the PR.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Nothing. The PR is the human-legible artifact if you want one.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> <code>gate_docs_only</code> enforces the two-commit shape — code in one, docs in the other.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">06</div>
+        <div class="stage-body">
+          <h3>Review</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> PR review comment + <span class="out">APPROVE</span> / <span class="out">REQUEST_CHANGES</span></p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>A <strong>fresh subagent</strong> with no build context reads the PR cold.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Optional read.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> REQUEST_CHANGES loops back to Build. Context isolation is the load-bearing part — a same-session self-review would just rationalize.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">07</div>
+        <div class="stage-body">
+          <h3>Merge</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> merged PR, green CI</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Squash-merges. It can't self-approve (GitHub blocks it), so it posts a review comment and merges.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Nothing.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> CI plus the pre-push wall — in a mature repo that's 30+ hooks (bandit, mypy, detect-secrets, cargo-audit) and a dozen workflows, not the three checks the harness repo runs on itself.</p>
+          <p class="field"><span class="lbl">At scale</span> Merges target the <strong>active release line, not trunk</strong> — <code>pr_target_branch: "1.1"</code>, with a documented escape hatch to the stabilization line for P0 regressions.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">08</div>
+        <div class="stage-body">
+          <h3>Learn</h3>
+          <p class="artifact"><span class="lbl">Artifact</span> <span class="out">pr/feedback/retro-N-*.md</span> (5 sections) + a <span class="out">tech-debt</span> issue per deferred finding</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Writes both. Roughly 30–60 seconds per finding, and the PR still merges on schedule.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Nothing.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> The hard programmatic <code>gate_retro_artifact</code> — the pipeline cannot report done without the file on disk.</p>
+          <p class="field"><span class="lbl">At scale</span> 390 review artifacts on disk, and a daily CI job that scans merged PRs for a missing Stage 14 retro. The gate has an auditor.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">09</div>
+        <div class="stage-body">
+          <h3>Close <span class="skill">/pipeline-retro --reconcile</span></h3>
+          <p class="artifact"><span class="lbl">Artifact</span> RETRO.md bucket entry + Action Tracker rows</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Dedupes across PR retros, files issues, updates the tracker.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Skims the tracker.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> Soft — verification sub-stages re-check every "Action taken:" line, so the machine audits itself. Realistically this is where a human <em>should</em> look and mostly doesn't.</p>
+          <p class="field"><span class="lbl">At scale</span> 330 tracker rows, <strong>323 closed</strong> — and a status value the harness doesn't define, <code>OUT-OF-REPO</code>, on 41 rows that point at issues filed against the harness itself.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">10</div>
+        <div class="stage-body">
+          <h3>Release <span class="skill">RELEASING.md · release skill</span></h3>
+          <p class="artifact"><span class="lbl">Artifact</span> version bump, CHANGELOG cut, git tag, published package, release notes</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Bumps the version, auto-increments the RC, updates the changelog, verifies, tags, publishes.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Decides <em>when</em> to cut — RC train vs GA, which release line, whether the soak is done.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> A pre-release security audit workflow, a release-workflow dependency check, and CodeQL — automated, but the cut itself is a judgment call the human makes by invoking it.</p>
+          <p class="field"><span class="lbl">Note</span> <strong>This stage was missing from my first draft.</strong> Merge is not shipped: real repos run RC trains (rc1→rc14 in one case), release branches, and a separate publish path. If you only model up to Merge, you model half the lifecycle.</p>
+        </div>
+      </article>
+
+      <article class="stage" data-role="machine">
+        <div class="num">11</div>
+        <div class="stage-body">
+          <h3>Operate / Drain <span class="skill">/pipeline-drain · /pipeline-roadmap-audit</span></h3>
+          <p class="artifact"><span class="lbl">Artifact</span> incidents, inbound bugs, and the next <strong>drain bucket</strong> — a named batch of 5–7 issues</p>
+          <div class="split">
+            <div class="ai"><span class="lbl">AI does</span><p>Batches issues into buckets, audits ROADMAP drift, diagnoses reported bugs.</p></div>
+            <div class="hu"><span class="lbl">Human does</span><p>Is the source of production signal. The single externally-sourced bug beat everything dogfooding found — which is what ADR-0002 was written about.</p></div>
+          </div>
+          <p class="gate"><span class="lbl">Gate</span> <code>terminal-state.sh</code> — clean means stop; not clean means assemble the next bucket. Deferred issues must be closed or labelled <code>backlog</code>/<code>wontfix</code>/<code>someday</code>, or the loop livelocks under <code>--auto</code>.</p>
+          <p class="field"><span class="lbl">At scale</span> <strong>This is the loop, not its tail.</strong> A 4,886-line ROADMAP organised as successive drain buckets — "post-12 drain", "post-13 drain" — each shipping into the active release. Retro → issue → bucket → 5–7 PRs → retro, over and over.</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>The ratchet</h2>
+    <p class="note">The pipeline ships its own features through itself — every version from v0.1.0 to v0.8.0 went through these stages, and <code>terminal-state.sh</code> once correctly reported the milestone that built it as not-clean. That self-hosting is what makes the loop improve: a failure surfaced in one lap becomes a gate that the next lap cannot get past.</p>
+
+    <figure>
+      <div class="plate">
+        <svg class="flow" viewBox="0 0 900 372" role="img" aria-label="Diagram of how a finding becomes canon: noticed mid-PR, into a PR retro, then a tech-debt issue, then a drain bucket, then the CANON.md decision rule routes it to one of four venues drawn as a rising staircase — CLAUDE.md, pre-push hook, CI workflow, template mandatory item — each harder to bypass than the last.">
+          <defs>
+            <marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path class="mk" d="M0 0 L8 4 L0 8 Z"></path>
+            </marker>
+          </defs>
+
+          <!-- intake chain -->
+          <rect class="n-chip" x="20" y="16" width="175" height="32" rx="3"></rect>
+          <text class="t-sub" x="107" y="36" text-anchor="middle">noticed mid-PR</text>
+          <line class="edge" x1="195" y1="32" x2="211" y2="32" marker-end="url(#ar2)"></line>
+
+          <rect class="n-chip" x="211" y="16" width="150" height="32" rx="3"></rect>
+          <text class="t-sub" x="286" y="36" text-anchor="middle">PR retro</text>
+          <line class="edge" x1="361" y1="32" x2="377" y2="32" marker-end="url(#ar2)"></line>
+
+          <rect class="n-chip" x="377" y="16" width="170" height="32" rx="3"></rect>
+          <text class="t-sub" x="462" y="36" text-anchor="middle">tech-debt issue</text>
+          <line class="edge" x1="547" y1="32" x2="563" y2="32" marker-end="url(#ar2)"></line>
+
+          <rect class="n-chip" x="563" y="16" width="155" height="32" rx="3"></rect>
+          <text class="t-sub" x="640" y="36" text-anchor="middle">drain bucket</text>
+
+          <!-- into the decision -->
+          <path class="edge" d="M640 48 V68 H450 V86" marker-end="url(#ar2)"></path>
+          <rect class="n-dec" x="330" y="86" width="240" height="36" rx="18"></rect>
+          <text class="t-sub" x="450" y="109" text-anchor="middle">CANON.md — which venue?</text>
+
+          <!-- fan to the four venues -->
+          <path class="edge" d="M450 122 V132"></path>
+          <path class="edge" d="M122 132 H768"></path>
+          <path class="edge" d="M122 132 V252" marker-end="url(#ar2)"></path>
+          <path class="edge" d="M334 132 V218" marker-end="url(#ar2)"></path>
+          <path class="edge" d="M546 132 V184" marker-end="url(#ar2)"></path>
+          <path class="edge" d="M768 132 V150" marker-end="url(#ar2)"></path>
+
+          <!-- staircase: weakest to strongest guard -->
+          <rect class="n-step" x="20" y="252" width="205" height="88" rx="3"></rect>
+          <text class="t-name" x="34" y="274">CLAUDE.md</text>
+          <text class="t-sub" x="34" y="290">bypass: just forget</text>
+          <text class="t-edge" x="34" y="308">E.G. TRIAGE JUDGMENT RULES</text>
+
+          <rect class="n-step" x="232" y="218" width="205" height="122" rx="3"></rect>
+          <text class="t-name" x="246" y="240">pre-push hook</text>
+          <text class="t-sub" x="246" y="256">bypass: --no-verify</text>
+          <text class="t-edge" x="246" y="274">E.G. NO BARE # NOQA</text>
+
+          <rect class="n-step" x="444" y="184" width="205" height="156" rx="3"></rect>
+          <text class="t-name" x="458" y="206">CI workflow</text>
+          <text class="t-sub" x="458" y="222">bypass: admin merge</text>
+          <text class="t-edge" x="458" y="240">E.G. DAILY RETRO AUDIT</text>
+
+          <rect class="n-step-hard" x="656" y="150" width="224" height="190" rx="3"></rect>
+          <text class="t-name" x="670" y="172">template mandatory item</text>
+          <text class="t-sub" x="670" y="188">bypass: none — stage halts</text>
+          <text class="t-edge" x="670" y="206">E.G. TWO-COMMIT SHAPE</text>
+
+          <text class="t-edge" x="20" y="362">RISING = HARDER TO BYPASS</text>
+          <text class="t-edge" x="880" y="362" text-anchor="end">RULES GET PROMOTED UPWARD OVER TIME</text>
+        </svg>
+      </div>
+      <figcaption>
+        <p class="note">The intake is asynchronous by design — a finding noticed during feature A never blocks feature A. It waits in a retro, becomes an issue, and gets processed in a bucket built for it.</p>
+      </figcaption>
+    </figure>
+
+    <p class="pull"><strong>Stage 7 Self-Review shipped with 5 mandatory items. In the consumer repo it now runs 9 of 15</strong> — and every addition names the incident that created it, down to the near-miss that put a private client's name in a commit subject. That is the ratchet, measured.</p>
+
+    <div class="findings">
+      <p><strong>Rules climb.</strong> Where a rule lands isn't where it stays. ADR-0001 moved the quality gates from prose inside SKILL.md into <code>scripts/pipeline-gates.sh</code> — the same rule, one rung up, now executable by CI as well as by the agent. The ladder is a promotion path, not a filing cabinet.</p>
+      <p><strong>The ratchet takes effect on the very next run.</strong> Templates are re-read from disk between stages, so a checklist item added after this morning's incident gates this afternoon's PR. No skill reinstall, no session restart, no waiting for the change to propagate.</p>
+      <p><strong>It improves for everyone, not just itself.</strong> The downstream consumer files findings back at the harness under a tracker status the harness never defined — 41 of them. Fixes made there land in the templates every other repo inherits.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>It reshapes to the repo</h2>
+    <p class="note">The same skill files behave differently in every repository, because four layers merge at runtime — each one able to override the last.</p>
+
+    <div class="layers">
+      <div class="layer">
+        <span class="lnum">01</span>
+        <h3>Built-in template</h3>
+        <p>The stage skeleton, verdicts, and baseline mandatory items — <code>templates/feature-state.json</code> and friends.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">02</span>
+        <h3>Built-in profile</h3>
+        <p>Framework-level security patterns and auto-reject triggers. Selected by detection: <code>manage.py</code> present → django, otherwise generic.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">03</span>
+        <h3>Project CLAUDE.md</h3>
+        <p>Default branch, PR target, test / lint / build commands, changelog style, profile override.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">04</span>
+        <h3>Per-repo overrides</h3>
+        <p><code>.pipeline-templates/</code> and <code>.pipeline/profile.json</code> — extra checklist items, patched stages, a different PR target. This is where a repo's own hard-won rules live.</p>
+      </div>
+    </div>
+
+    <div class="findings">
+      <p><strong><code>/pipeline-init</code> writes layers 3 and 4 by detection</strong> — default branch, test/lint/build commands, ROADMAP format, version scheme — and migrates a foreign-format ROADMAP into the one the parser actually reads. It was proven on a deliberately hostile repo: <code>master</code> instead of <code>main</code>, Node instead of Python, <code>npm test</code>, a checkbox ROADMAP. Migrated, ran end to end, PR opened against <code>master</code>, reviewed, squash-merged.</p>
+      <p><strong>Same harness, two repos.</strong> Here it runs <code>make check</code> on a stdlib script with no test runner and targets <code>main</code>. There it runs 30+ pre-push hooks across Python and Rust, targets an active release branch instead of trunk, and greps every diff for private client identifiers. Nothing in <code>skills/</code> differs between them — the entire difference lives in layers 3 and 4.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What it looks like at scale</h2>
+
+    <div class="stats">
+      <div class="stat"><span class="fig">647</span><span class="cap">pipeline state files<br>~440 typed runs</span></div>
+      <div class="stat"><span class="fig">390</span><span class="cap">per-PR review artifacts</span></div>
+      <div class="stat"><span class="fig">323<span style="color:var(--faint)">/330</span></span><span class="cap">tracker rows closed</span></div>
+      <div class="stat"><span class="fig">4</span><span class="cap">strategy sessions<br>in ~440 runs</span></div>
+      <div class="stat"><span class="fig">25</span><span class="cap">canon sections<br>in CLAUDE.md</span></div>
+      <div class="stat"><span class="fig">41</span><span class="cap">findings filed back<br>at the harness</span></div>
+    </div>
+
+    <div class="findings">
+      <p><strong>The skeleton survives contact.</strong> The 14-stage template is unchanged in structure — same stage names, same subagent split at Code Review / Merge / Retrospective. What grew is density: mandatory checklist items roughly doubled, and every addition cites the incident that caused it.</p>
+      <p><strong>All four canon venues fill up, in the predicted order.</strong> CLAUDE.md carries 25 "process canonicalizations from <em>X</em> retro arc" sections across 1,543 lines; the pre-push wall runs 30+ hooks including repo-specific ones; CI runs 13 workflows — one of which is a daily audit for merged PRs that skipped their retro, which is <em>precisely</em> CANON.md's worked example, built for real.</p>
+      <p><strong>The upstream channel is the surprise.</strong> A tracker status the harness never defined — <code>OUT-OF-REPO</code> — marks 41 findings blocked on the harness repo, excluded from the consumer's own open count. The consumer instrumented its feedback into the tool. That is ADR-0002's thesis running unattended.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What spans stages</h2>
+
+    <div class="spans">
+
+      <div class="span-item">
+        <h3>Shared context</h3>
+        <div class="col">
+          <p>Four artifacts do the work: the <strong>state file</strong> (program counter, immune to context compression), <strong>CLAUDE.md</strong> (canon), <strong>ROADMAP.md</strong> (queue), <strong>RETRO.md + Action Tracker</strong> (memory). ADRs are the "why" layer that keeps Plan from re-litigating settled questions.</p>
+          <p>The state file is the good idea here — everything else is conventional. At scale a fifth appears that the harness doesn't specify: a one-line-per-PR ledger, with a quality score.</p>
+        </div>
+      </div>
+
+      <div class="span-item">
+        <h3>Guardrails</h3>
+        <div class="col">
+          <p><strong>CANON.md's four-venue ladder is the most reusable thing in this repo</strong> and I'd lift it into any project: CLAUDE.md → pre-push → CI → template mandatory item, weakest guard to strongest.</p>
+          <p>The decision rule — "fires on every PR + prose discipline + not runtime-checkable → template canon" — is what stops rules from piling up in the weakest venue. Worth watching: at scale CLAUDE.md still swells to 1,500+ lines, which is the venue the ladder itself calls easiest to forget.</p>
+        </div>
+      </div>
+
+      <div class="span-item">
+        <h3>Tooling</h3>
+        <div class="col">
+          <p><code>pipeline.py</code> as harness; <code>scripts/*.sh</code> as gates that are <em>executables, not prose</em> (ADR-0001); <code>make check</code> and <code>make terminal-state</code>; profiles for framework-specific security patterns; <code>gh</code> for issues and PRs. Concurrency comes from git worktrees — one per agent, ~20 in flight at peak.</p>
+        </div>
+      </div>
+
+      <div class="span-item">
+        <h3>Evals <span class="chip">Gap</span></h3>
+        <div class="col">
+          <p>The harness ships <strong>checks</strong> (CI, gate scripts, template validator) and <strong>validation runs</strong> (foreign-repo e2e), but no eval suite. Nothing upstream measures the thing the whole design claims: <em>does the executor still tick Stage N when context is under pressure?</em></p>
+          <p><strong>Except downstream, where someone built one.</strong> A bypass-audit script plus a daily workflow scans merged PRs for missing retro markers — a real compliance measurement of the harness's central promise. It has never been promoted upstream. Adopting it, plus a fixtures directory of state files replayed to assert the executor refuses to advance past unticked mandatory items, would close this leg with work that already exists.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>What should move upstream</h2>
+    <p class="note">Everything below already exists downstream and is missing from the harness. All eleven are now filed as <strong>issues #68–#78</strong>, ranked in <code>ROADMAP.md</code> under <strong>Future → Upstream candidates</strong>, and tracked as Action Tracker rows 12–22 (PR #79) — so the next <code>/pipeline-strategy</code> survey surfaces them instead of rediscovering them.</p>
+
+    <div class="layers">
+      <div class="layer">
+        <span class="lnum">01</span>
+        <h3>Retro-bypass audit</h3>
+        <p>A daily scan of merged PRs for a missing Stage-14 retro marker. <strong>The highest-value item by a distance</strong> — it is the only existing measurement of the family's central promise, and CANON.md already cites exactly this as its CI-venue worked example while the harness ships no such thing.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">02</span>
+        <h3>Release stage</h3>
+        <p>Merged ≠ shipped. RC trains, release branches, a pre-release security audit, and a publish path all run outside the model today.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">03</span>
+        <h3>Release-line targeting</h3>
+        <p><code>pr_target_branch</code> is honoured but <code>/pipeline-init</code> only detects the <em>default</em> branch, so every consumer on a release-branch model hand-edits all its templates.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">04</span>
+        <h3><code>OUT-OF-REPO</code> status</h3>
+        <p>A tracker status for findings blocked on another repo, excluded from the local open count — with a matching <code>terminal-state.sh</code> rule. Same livelock class as the deferred-label fix in v0.8.0.</p>
+      </div>
+      <div class="layer">
+        <span class="lnum">05</span>
+        <h3>PR ledger</h3>
+        <p>Both repos keep a one-line-per-PR log and no skill writes it. Stage 14 should append it.</p>
+      </div>
+    </div>
+
+    <p class="note">Also queued: documenting the drain-bucket cadence as the real steady state, concurrency guidance for parallel worktrees, a forbidden-identifier scan as a profile feature, the extra pipeline types invented downstream, canon-compaction guidance in CANON.md, and executor eval fixtures. Three more — the <code>gh issue create</code> URL-parse trap, a ROADMAP duplicate-heading guard, and a pre-commit unstaged-work-preservation reflex — are already written into the skills and waiting on a commit.</p>
+  </section>
+
+  <section class="close">
+    <p>Two human gates exist in practice: <strong>choose the path</strong> and <strong>triage a failure</strong>. Everything between is machine-gated by verdicts, mandatory checklist ticks, executable gates, and CI. That's the correct allocation — humans are best at "which direction" and worst at "did stage 11 of 14 actually run," and the machine is the reverse.</p>
+    <p>What checking the model against a real consumer changed: <strong>the drain loop is the main loop.</strong> Formal planning happens about four times per release line; the other several hundred runs are retro → issue → bucket → PRs → retro. The harness under-instruments that leg, so its heaviest user hand-rolled the missing parts — bucket-structured roadmap, PR ledger, retro-bypass audit. The prototypes for the upstream fix are already written; they're just in the wrong repo.</p>
+    <p>The part worth stealing even if you never adopt the harness: <strong>a process that only gets stricter.</strong> Most conventions decay — someone documents a rule, everyone forgets it, the rule dies in a stale wiki. This one runs the other direction, because a lesson is only finished when it has been promoted to a venue that can refuse the next PR. The stage list is the visible artifact; the ratchet is the actual product.</p>
+  </section>
+
+  <footer>
+    <span>pipeline-skill · 11 skills · 6 templates · 3 ADRs — checked against a consumer repo at ~440 harness runs</span>
+    <span class="flinks"><a href="https://github.com/johnrtipton/pipeline-skills">Repository</a> · <a href="https://github.com/johnrtipton/pipeline-skills/blob/main/docs/lifecycle-model.md">Markdown version</a> · <a href="https://github.com/johnrtipton/pipeline-skills/issues?q=is%3Aissue+label%3Atech-debt">Upstream candidates</a></span>
+  </footer>
+
+</div>
+</body>
+</html>
