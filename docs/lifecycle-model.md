@@ -5,6 +5,11 @@
 > a failure. Everything in between is gated by verdict strings, mandatory
 > checklist ticks, executable gate scripts, and CI.
 
+> 📐 **A typeset version of this document, with the diagrams drawn properly, is
+> published at
+> [johnrtipton.github.io/pipeline-skills](https://johnrtipton.github.io/pipeline-skills/lifecycle-model.html).**
+> This Markdown copy carries the same content for reading in-repo and in diffs.
+
 This document describes the *shape* of the process, not the commands. For the
 commands see the [README](../README.md); for the design rationale see
 [CLAUDE.md](../CLAUDE.md); for where a rule should live see

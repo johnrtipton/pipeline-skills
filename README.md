@@ -15,10 +15,11 @@ Claude Code can't reliably execute a 15-stage pipeline from a single skill promp
 
 > **The lifecycle this implements** — twelve stages, the two places a human is
 > actually needed, and the canon ratchet that turns each surviving failure into a
-> rule the next PR can't bypass — is written up in
-> [The two-gate lifecycle](docs/lifecycle-model.md). It is checked against a
-> consumer repo at ~440 harness runs, so the corrections in it come from real
-> usage rather than design intent.
+> rule the next PR can't bypass — is written up in **[The two-gate
+> lifecycle](https://johnrtipton.github.io/pipeline-skills/lifecycle-model.html)**
+> ([Markdown version](docs/lifecycle-model.md)). It is checked against a consumer
+> repo at ~440 harness runs, so the corrections in it come from real usage rather
+> than design intent.
 
 ## Skill Reference
 
