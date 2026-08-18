@@ -279,6 +279,41 @@ The branch-verify reflex above guards *commits*; this guards *builds/scp/ship
 from the working tree*, which a review subagent can silently dirty. Run both as
 reflexes — they are cheap and catch different failure modes.
 
+### Unstaged-work-preservation reflex (before any pipeline commit) (#292)
+
+pre-commit stashes UNSTAGED working-tree files to `~/.cache/pre-commit/patch<ts>`,
+runs hooks against the staged snapshot, then restores. A failed/skipped restore
+(the stash-pop-conflict class — same root as the swallowed-commit failure mode in
+"MANDATORY Post-Commit Verification") leaves that unstaged work ONLY in the patch
+cache, silently absent from the tree. The Worktree-restore reflex above compounds
+this: its `git restore --worktree .` / `git clean -fd` will DISCARD unstaged
+tracked edits and untracked files outright.
+
+So when unstaged work you are NOT committing coexists with a pipeline commit — a
+collaborator's in-progress drafts, scratch edits you promised to preserve — do NOT
+trust the commit / checkout / restore to keep it. Set it aside yourself:
+
+```bash
+# Before the commit: stash the unrelated unstaged work you are NOT shipping.
+git stash push -- <paths you are NOT committing>
+# ... stage + commit only the files you ARE shipping ...
+git stash pop          # restore the set-aside work afterward (still unstaged)
+```
+
+If you skipped that and the work vanished post-commit, it is almost certainly in
+the pre-commit cache — recover it:
+
+```bash
+grep -rl '<distinctive text>' ~/.cache/pre-commit/   # find the newest patch
+git apply ~/.cache/pre-commit/patch<newest>          # restore it (unstaged)
+```
+
+Observed: a collaborator's uncommitted `BEST_PRACTICES*.md` drafts vanished after a
+pipeline commit cycle and were recovered from the patch cache (djust CLAUDE.md
+"Pre-commit can drop unstaged files", Action #292). Corollary: never run the
+Worktree-restore reflex's `git clean -fd` / `git restore --worktree .` while
+legitimate unstaged work is present.
+
 ```bash
 # 1. Stage the files you intend to commit FIRST.
 git add <file1> <file2> ...

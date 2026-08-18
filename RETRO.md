@@ -17,7 +17,19 @@ issue or be explicitly closed with a reason.
 | 8 | Review subagents leave the executor's working tree on `main` → builds/scp from a stale tree | Retro v0.3.0 / djustlive v0.4.0 | #36 | Closed | Resolved in PR #39 (v0.4.0) — template restore-HEAD step + pipeline-run worktree-restore reflex |
 | 9 | Worktree-restore reflex doesn't remove untracked files left by a subagent | Retro v0.4.0 / PR #39 | #40 | Closed | Resolved in PR #49 (v0.5.0) — `git clean -fd` + re-verify |
 | 10 | `detect_default_branch` returns `main` for a `master`-default repo with no `origin/HEAD` | Retro v0.5.0 / PR #46 | #45 | Closed | Resolved in PR #53 (v0.6.0) — origin-probe + current-branch fallback; validated end-to-end in PR #55 |
-| 11 | `/pipeline-cycle` + terminal-state can livelock on a deferred-but-open issue | Retro v0.7.0 / PR #59 | #61 | Open | terminal-state counts all open issues; an issue triage never promotes stalls the loop. Fix: exclude `backlog`/`wontfix` from the clean check, or strategy must close-with-reason |
+| 11 | `/pipeline-cycle` + terminal-state can livelock on a deferred-but-open issue | Retro v0.7.0 / PR #59 | #61 | Closed | Resolved in PR #63 (v0.8.0) — terminal-state excludes `backlog`/`wontfix`/`someday`-labelled issues from the clean check |
+| 12 | Port the retro-bypass audit upstream (daily scan for merged PRs with no Stage-14 retro) | Downstream audit 2026-08-18 | #68 | Open | Highest-value item: the only existing *measurement* of the family's central promise. CANON.md already cites it as the CI-venue worked example but the harness ships nothing |
+| 13 | Family models nothing after Merge — no Release stage | Downstream audit 2026-08-18 | #69 | Open | RC trains, release branches, pre-release security audit, publish path all run outside the harness |
+| 14 | `/pipeline-init` detects only the default branch, not an active release line | Downstream audit 2026-08-18 | #70 | Open | Consumers on a release-branch model hand-edit every template's `pr_target_branch` |
+| 15 | No `OUT-OF-REPO` tracker status for findings blocked on another repo | Downstream audit 2026-08-18 | #71 | Open | Downstream invented one (41 rows, most pointing here). Needs retro support + a terminal-state counting rule — same livelock class as #61 |
+| 16 | `.pipeline-log.md` is kept by hand in both repos and specified by neither | Downstream audit 2026-08-18 | #72 | Open | Candidate: Stage 14 appends the ledger line |
+| 17 | Docs imply milestone-first planning; real steady state is drain-bucket-first | Downstream audit 2026-08-18 | #73 | Open | 4 strategy sessions in ~440 runs; the drain loop is the main loop |
+| 18 | No guidance for running pipelines concurrently across worktrees | Downstream audit 2026-08-18 | #74 | Open | ~20 worktrees at peak; the two-commit CHANGELOG gate exists because two implementers collided |
+| 19 | Forbidden-identifier scan is repo-local; should be a profile feature | Downstream audit 2026-08-18 | #75 | Open | Generalizes the Stage-7 name-leak grep for any repo extracted from private client work |
+| 20 | Extra pipeline types + per-run sidecars invented downstream, absent upstream | Downstream audit 2026-08-18 | #76 | Open | `investigation`, `milestone-retro`, `review-existing-pr`; `<run>-plan.md` / `<run>-changes.txt` |
+| 21 | CANON.md says how to choose a venue, not how to compact one that overflows | Downstream audit 2026-08-18 | #77 | Open | Downstream CLAUDE.md at 1,543 lines / 25 retro-arc sections — the weakest venue accumulating the most |
+| 22 | No executor eval fixtures asserting refusal to advance past unticked mandatory items | Downstream audit 2026-08-18 | #78 | Open | Instruction-rot resistance is asserted, not measured. Pairs with #68 |
+| 23 | ROADMAP.md carried four malformed duplicate `## Completed` headings | Downstream audit 2026-08-18 | — | Closed | Fixed in this pass — a live instance of the duplicate-heading drift the in-flight `pipeline-drain` guard was written to prevent |
 
 <!-- Milestone retro entry template:
 ## <milestone> — <Title> (PRs #NN–#MM)

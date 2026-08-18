@@ -130,6 +130,17 @@ Also add an entry to the milestone's detail section:
 Add new entries to the milestone section in ROADMAP.md, following the existing
 format (bold issue number + title, em-dash, description).
 
+**Insert under the EXISTING canonical heading — do not create a duplicate.**
+Before adding a milestone section, grep the heading structure
+(`grep -nE '^## ' ROADMAP.md`) and insert under the single section that already
+exists (e.g. one `## Active` or one `## Completed`). Creating a second
+`## Completed` (or `## Active`) is the common drift — a new milestone block
+appended without checking leaves the file with two same-named headings, which
+makes the NEXT drain/retro's insert point ambiguous. If the repo's ROADMAP has
+no obvious single section for in-flight work, add ONE `## Active` heading and
+put the new milestone under it; mark it `✅` and move it under the existing
+`## Completed` at the milestone's retro.
+
 ### 7. Commit the ROADMAP update
 
 ```bash
@@ -237,7 +248,10 @@ of effort. Larger issues split out.
 ### Step A — File issues before the audit-doc PR
 
 ```
-gh issue create --label tech-debt --title "tech-debt: <summary>" --body "..."
+# `gh issue create` prints the new issue's URL — it has NO --json/-q flag, so
+# `-q .number` silently yields empty. Parse the trailing number off the URL:
+num=$(gh issue create --label tech-debt --title "tech-debt: <summary>" --body "..." | grep -oE '[0-9]+$')
+echo "filed #$num"
 ```
 
 File all N issues BEFORE opening the audit-doc PR. The audit doc can then

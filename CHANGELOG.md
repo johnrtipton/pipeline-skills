@@ -13,6 +13,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   `build_agent_cmd()`; the resolved backend + model persist in the state file so
   `--resume` keeps the same agent. `run_claude()` → `run_agent()`. Backward
   compatible: `claude` remains the default.
+- ROADMAP `## Future` → "Upstream candidates from downstream use" — 11 findings
+  (#68–#78) surfaced by auditing a consumer repo at ~440 harness runs, ranked by
+  value, with matching Action Tracker rows 12–22. Top items: port the
+  retro-bypass audit (#68, the only existing *measurement* of the family's
+  central promise), model a Release stage (#69, merged ≠ shipped), and release-line
+  PR targeting at init (#70).
 - `/pipeline-cycle` — the outer-loop orchestrator that chains
   `strategy → run --all → retro` across milestones to a clean terminal state.
   Semi-autonomous by default (pauses at each strategy decision per ADR-0003);
@@ -33,6 +39,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   retroactively at each milestone's retro commit (#48).
 
 ### Fixed
+- `pipeline-drain` / `pipeline-retro`: `gh issue create` has no `--json`/`-q`
+  flag — it prints the new issue's URL, so `-q .number` silently yielded empty.
+  Both skills now parse the number off the URL tail. The `\n`-in-`--body` trap
+  is documented alongside.
+- `pipeline-drain`: insert new milestone sections under the *existing* canonical
+  heading — creating a second `## Completed`/`## Active` leaves the next
+  drain/retro with an ambiguous insert point. (A live instance of exactly this
+  drift was found and repaired in this repo's own ROADMAP: four malformed
+  duplicate `## Completed` headings.)
+- `pipeline-run`: unstaged-work-preservation reflex — pre-commit stashes unstaged
+  files to its patch cache, and a failed restore combined with the
+  worktree-restore reflex's `git clean -fd` can discard them outright. Documents
+  stash-before-commit and patch-cache recovery.
+- ROADMAP.md: removed four malformed duplicate `## Completed` headings left by a
+  mangled substitution, restoring a single canonical section (Action Tracker #23).
 - `/pipeline-cycle` terminal-state now ignores `backlog`/`wontfix`/`someday`-labelled
   issues, so a deliberately-deferred open issue can't livelock the loop; the
   deferred-label rule is documented in the cycle skill + ADR-0003 (#61).
