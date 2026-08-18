@@ -241,12 +241,18 @@ For each milestone retro entry:
 
 2. **Create GitHub issues** — for every new Action Tracker row:
    ```bash
-   gh issue create \
+   # `gh issue create` has NO --json/-q flag — it prints the new issue's URL on
+   # stdout. Do NOT pipe `-q .number` (silently yields empty). Parse the URL:
+   num=$(gh issue create \
      --title "tech-debt: <action summary>" \
-     --body "Source: <milestone retro or PR number>\n\n<details>" \
-     --label "tech-debt"
+     --body "Source: <milestone retro or PR number>
+
+<details>" \
+     --label "tech-debt" | grep -oE '[0-9]+$')
+   echo "filed #$num"
    ```
-   Record the issue number in `new_github_issues`.
+   Record `$num` in `new_github_issues`. (The bare `\n` in `--body` is also a
+   trap — `gh` does not interpret it; use a real newline or a heredoc/`$'...'`.)
 
 3. **Backfill prose Action taken: lines** — for each `tracker_row` finding,
    replace the prose in `RETRO.md` with `Open — tracked in Action Tracker
