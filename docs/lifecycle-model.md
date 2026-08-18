@@ -47,7 +47,20 @@ flowchart TD
     L -.->|domain facts| KB
     C -.->|new rule| CANON["CANON LADDER"]
     CANON -.-> B
+
+    classDef machine fill:#E7F0F6,stroke:#2F6E8F,stroke-width:1px,color:#12303F
+    classDef human fill:#FAEDD8,stroke:#A96209,stroke-width:2px,color:#5A3405
+    classDef ctx fill:#F2F4F7,stroke:#9AA4B2,stroke-width:1px,color:#2A303A
+    classDef term fill:#FFFFFF,stroke:#5A6472,stroke-width:1px,color:#2A303A
+    class P,S,B,V,SH,R,M,L,C,REL,O machine
+    class G1,G2 human
+    class KB,CANON ctx
+    class T,DONE term
 ```
+
+**Blue = machine-gated · amber = human gate · grey = standing context.** Only the
+two amber nodes stop for a person; everything blue is gated by a verdict string,
+a mandatory checklist tick, an executable gate script, or CI.
 
 Stages 02–09 run many times per lap — several PRs per drain bucket, often
 concurrently in separate git worktrees.
@@ -199,16 +212,38 @@ makes the loop improve: **a failure surfaced in one lap becomes a gate the next
 lap cannot get past.**
 
 ```mermaid
-flowchart LR
+flowchart TD
     A["noticed mid-PR"] --> B["PR retro"]
     B --> C["tech-debt issue"]
     C --> D["drain bucket"]
-    D --> E{"CANON.md<br/>which venue?"}
-    E --> V1["CLAUDE.md<br/>bypass: just forget"]
-    E --> V2["pre-push hook<br/>bypass: --no-verify"]
-    E --> V3["CI workflow<br/>bypass: admin merge"]
-    E --> V4["template mandatory item<br/>bypass: none — stage halts"]
+    D --> E{"CANON.md — which venue?"}
+    E --> LADDER
+
+    subgraph LADDER["the canon ladder — weakest to strongest guard"]
+      direction TB
+      V1["① CLAUDE.md · bypass: just forget"]
+      V2["② pre-push hook · bypass: --no-verify"]
+      V3["③ CI workflow · bypass: admin merge"]
+      V4["④ template mandatory item · bypass: none, the stage halts"]
+      V1 -.->|promoted| V2
+      V2 -.->|promoted| V3
+      V3 -.->|promoted| V4
+    end
+
+    classDef intake fill:#F2F4F7,stroke:#9AA4B2,stroke-width:1px,color:#2A303A
+    classDef dec fill:#FFFFFF,stroke:#5A6472,stroke-width:1px,color:#2A303A
+    classDef weak fill:#EEF3F7,stroke:#B7D0DF,stroke-width:1px,color:#12303F
+    classDef strong fill:#E7F0F6,stroke:#2F6E8F,stroke-width:2px,color:#12303F
+    class A,B,C,D intake
+    class E dec
+    class V1,V2 weak
+    class V3,V4 strong
+    style LADDER fill:#FFFFFF,stroke:#9AA4B2,stroke-width:1px,color:#2A303A
 ```
+
+**①→④ is the ratchet direction: each venue is harder to bypass than the last,
+and the dotted edges are the promotion path** — a rule does not have to stay
+where it first landed.
 
 The four venues are ordered weakest to strongest guard, and the choice is not
 arbitrary — [CANON.md](../CANON.md) gives the decision rule: *fires on every PR,
@@ -302,8 +337,20 @@ for missing retro markers — and it has never been promoted here.
 
 That, and ten other findings surfaced by the same audit, are captured in
 [ROADMAP.md § Future → Upstream candidates](../ROADMAP.md) with matching Action
-Tracker rows and GitHub issues
-([#68–#78](https://github.com/johnrtipton/pipeline-skills/issues?q=is%3Aissue+label%3Atech-debt)).
+Tracker rows and GitHub issues. The top five:
+
+| Issue | Candidate | Why |
+|-------|-----------|-----|
+| [#68](https://github.com/johnrtipton/pipeline-skills/issues/68) | Retro-bypass audit | The only existing *measurement* of the family's central promise. CANON.md already cites it as the CI-venue worked example; the harness ships nothing |
+| [#69](https://github.com/johnrtipton/pipeline-skills/issues/69) | Release stage | Merged ≠ shipped — RC trains, release branches, publish path all run outside the model |
+| [#70](https://github.com/johnrtipton/pipeline-skills/issues/70) | Release-line PR targeting at init | `pr_target_branch` is honoured but init detects only the default branch |
+| [#71](https://github.com/johnrtipton/pipeline-skills/issues/71) | `OUT-OF-REPO` tracker status | Findings blocked on another repo must not stall the loop toward terminal |
+| [#72](https://github.com/johnrtipton/pipeline-skills/issues/72) | Specify `.pipeline-log.md` | Both repos keep a PR ledger by hand; neither skill writes it |
+
+The rest ([#73–#78](https://github.com/johnrtipton/pipeline-skills/issues?q=is%3Aissue+label%3Atech-debt)):
+drain-bucket cadence as documented canon, concurrency guidance, forbidden-identifier
+scan as a profile feature, the extra pipeline types, canon-compaction guidance, and
+executor eval fixtures.
 
 ---
 
