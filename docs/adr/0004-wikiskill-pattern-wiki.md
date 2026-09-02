@@ -1,6 +1,6 @@
 # ADR-0004: Separate the pattern wiki from the rule sheet, and gate rules on measured impact
 
-**Status**: Proposed
+**Status**: Accepted — skill-side changes (3, 4, 5 + CANON.md guidance) implemented in PR #81; consumer-side split (1, 2) is per-repo
 **Date**: 2026-09-01
 **Source**: WikiSkill — *Persistent Knowledge for Agent Skill Evolution* (arXiv 2608.27454), applied to the djust consumer repo at ~440 harness runs. Closes ROADMAP Future item #77 (canon-compaction guidance) and gives #68 (retro-bypass audit) a per-rule companion.
 
@@ -84,7 +84,7 @@ row) maintains the two count columns.
 
 ### 3. Add a gating stage to `pipeline-retro`
 
-New **Stage 3b — Gate the rule sheet**, between Synthesis and the Action
+New **Stage 3.7 — Gate the rule sheet**, between Synthesis and the Action
 Tracker update, run for every rule in force for at least two milestones:
 
 ```
@@ -150,7 +150,7 @@ no living pattern behind them.
 |---|---|---|
 | 1 · split | extract the consumer's 31 canonicalization sections into class pages with instance tables; reduce `CLAUDE.md` to rules + pointers; no skill behaviour change | one docs PR in the consumer; `CANON.md` gains the compaction guidance (#77) |
 | 2 · tag and track | Stage 11 findings carry a class; tracker rows gain pattern / fired / re-violated; Stage 4 plan gains "patterns in play"; briefs narrow to named pages | `pipeline-run`, `pipeline-retro`, `pipeline-shared` |
-| 3 · gate | Stage 3b lands once two milestones of tagged findings exist; first run is **dry** (prints KEEP / HARDEN / DEMOTE without applying) | `pipeline-retro`; `PURPOSE.md` files land alongside |
+| 3 · gate | Stage 3.7 lands once two milestones of tagged findings exist; first run is **dry** (prints KEEP / HARDEN / DEMOTE without applying) | `pipeline-retro`; `PURPOSE.md` files land alongside |
 
 ## What we deliberately do not take from the paper
 
