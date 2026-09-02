@@ -16,6 +16,7 @@ for skill in "${SCRIPT_DIR}/skills/pipeline-"*; do
     else
         mkdir -p "$target"
         cp "$skill/SKILL.md" "$target/SKILL.md"
+        [ -f "$skill/PURPOSE.md" ] && cp "$skill/PURPOSE.md" "$target/PURPOSE.md"
         echo "Copied $name → $target"
     fi
 done

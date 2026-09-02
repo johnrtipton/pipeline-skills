@@ -660,6 +660,23 @@ Previous stage results:
 ...
 ```
 
+### Wiki access rule for subagent prompts (ADR-0004)
+
+When the repo has `docs/patterns/`, the session hook already injects the
+rule sheet (`CLAUDE.md`) into every subagent. Do not also paste the wiki.
+What each role gets from `docs/patterns/`:
+
+| role | gets |
+|---|---|
+| Planning (Stage 4) | the whole directory — it is the proposer consulting the wiki; the plan must name **patterns in play** |
+| Implementation / Fix / fixer | the *patterns in play* pages from the plan, inline, and nothing else |
+| Code Review | the same pages, plus the *Detection* section of every page marked `candidate for mechanical gate: yes` |
+| Retrospective | the index (`docs/patterns/README.md`) so it can tag `new` findings and stub pages |
+
+Read the pages named in `.pipeline-state/<branch>-plan.md` under
+`patterns in play` and append their contents to the prompt after the
+checklist. If the plan says `none`, append nothing.
+
 ### Branch-checkout preamble for code-writing subagents
 
 Any subagent that **writes files** — Implementation, Address Findings
@@ -963,6 +980,9 @@ Code Review and Retrospective stages must meet minimum depth requirements.
 - At least 2 specific line-number citations from the diff
 - At least 1 question or concern (even if minor)
 - Statement of what edge cases were considered
+- A `[class: <pattern>]` tag on every 🔴/🟡 finding when the repo has
+  `docs/patterns/` (ADR-0004) — an untagged finding is invisible to the
+  milestone rule gate
 
 If the review comment is under 100 words, mark it `REVIEW_INSUFFICIENT` and
 re-run with: "Your review was too brief. Cite specific lines, raise at least

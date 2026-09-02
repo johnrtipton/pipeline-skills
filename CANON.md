@@ -76,6 +76,56 @@ that's pipeline-template canon territory.
 | "Daily audit: flag merged PRs missing retro markers" | CI workflow (`.github/workflows/retro-gate-audit.yml`) | Runs on a schedule, not on PR. Surfaces violations as workflow annotations. |
 | "Bug-report triage: trust the symptom, not the cited path" | CLAUDE.md section | Judgment rule for the agent, not mechanically checkable. |
 
+## Compacting canon: the pattern wiki and the rule sheet (ADR-0004)
+
+The ladder above says where a *new* rule goes. It says nothing about what
+happens to the venue that accumulates the most — `CLAUDE.md` — once it has
+thirty "process canonicalizations from *X* retro arc" sections and every
+subagent pays for all of them on every task. That is ROADMAP #77, and
+[ADR-0004](docs/adr/0004-wikiskill-pattern-wiki.md) gives it a mechanism
+borrowed from WikiSkill (arXiv 2608.27454): keep the **wiki** and the
+**rule sheet** apart, and give rules a lifecycle.
+
+**Two files with different jobs**
+
+| Layer | Lives in | Read by | Rolled back? |
+|---|---|---|---|
+| Rule sheet | `CLAUDE.md` — one line per rule + a pointer | every agent (injected by the session hook) | yes — a rule can be demoted or hardened |
+| Pattern wiki | `docs/patterns/<class>.md` — one page per failure class | the Stage 4 planner and `/pipeline-retro` | never — pages only grow |
+
+**A pattern page** carries the rule line, a status, an instance table, a
+detection section and a rejected-shapes section. The template is
+`docs/patterns/TEMPLATE.md` in this repo; `docs/patterns/README.md` is the
+index (class, rule, status, gate). A consumer that adopts the split copies
+both.
+
+**The lifecycle** — decided by `/pipeline-retro` Stage 3.7 for every rule
+in force for at least two milestones, from the pattern page's instance
+table:
+
+| decision | condition | effect |
+|---|---|---|
+| `KEEP` | fired > 0 and missed trending down | nothing |
+| `HARDEN` | missed ≥ 2 with the rule in force | prose did not work — file a proposal for a mechanical gate via the ladder above, citing the page |
+| `DEMOTE` | fired = 0 and missed = 0 for two milestones | drop the line from the rule sheet; the page stays |
+
+A rule may be demoted once; a second demotion deletes it from the rule
+sheet with the page kept as history. This is the fourth WikiSkill role
+(gating) the family previously lacked — the other three (inference,
+maintainer, proposer) map onto `pipeline-run` subagents, `pipeline-retro`,
+and the retro's canonicalize step.
+
+**Asymmetric access.** Implementer and reviewer subagents get the rule
+sheet plus only the pattern pages the plan names as *patterns in play*.
+The planner and the retro read the whole directory. The point is context
+cost and brief focus, not secrecy.
+
+**Compacting an existing `CLAUDE.md`** is one mechanical PR: for each
+retro-arc section, move its case study into the matching class page's
+instance table (creating the page if none fits), leave the one-line rule
+plus `→ docs/patterns/<class>.md` behind, and check the sheet shrinks to
+under ~30 KB. No skill behaviour changes in that PR.
+
 ## See also
 
 - [README.md](README.md) — pipeline-skill setup and skill reference
