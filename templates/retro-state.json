@@ -11,6 +11,8 @@
   "new_tracker_rows": [],
   "new_github_issues": [],
   "closed_rows": [],
+  "rule_gate_decisions": {},
+  "rule_gate_dry_run": null,
   "stages": {
     "1": {
       "name": "Identify milestone PRs",
@@ -66,6 +68,21 @@
         {"action": "output GATE_PASSED or GATE_FAILED with the indices of any prose_only findings", "done": false, "mandatory": true}
       ]
     },
+    "3.7": {
+      "name": "Gate the rule sheet (KEEP / HARDEN / DEMOTE)",
+      "status": "pending",
+      "verdict": null,
+      "_note": "ADR-0004. The only stage where a rule can LEAVE the rule sheet. Skip with RULE_GATE_SKIPPED only when the repo has no docs/patterns/. First run in a repo is a dry run (print decisions, change nothing).",
+      "checklist": [
+        {"action": "if no docs/patterns/ directory: output RULE_GATE_SKIPPED and mark stage skipped", "done": false},
+        {"action": "for every rule row in force >= 2 milestones: count fired / missed from docs/patterns/<class>.md instance table for this + prior milestone; cross-check the row's fired:/re-violated: lists", "done": false, "mandatory": true},
+        {"action": "decide KEEP (fired>0, missed not rising) | HARDEN (missed>=2) | DEMOTE (fired=0 and missed=0 for 2 milestones) per rule; write 'gate vX.Y.Z: <decision>' into the row's Notes", "done": false, "mandatory": true},
+        {"action": "HARDEN: queue a tracker row + GitHub issue proposing a mechanical gate (via CANON.md ladder), citing the pattern page; mark page 'candidate for mechanical gate: yes'", "done": false},
+        {"action": "DEMOTE: remove the rule line from CLAUDE.md; set page Status to wiki-only; never delete the page", "done": false},
+        {"action": "dry run (first run in repo, or --dry-run): print decisions, change nothing, record rule_gate_dry_run: true", "done": false},
+        {"action": "record rule_gate_decisions in state file; output RULE_GATE_DONE <keep>/<harden>/<demote> or RULE_GATE_DRY_RUN <counts>", "done": false, "mandatory": true}
+      ]
+    },
     "4": {
       "name": "Update Action Tracker",
       "status": "pending",
@@ -82,6 +99,7 @@
         {"action": "deduplicate: items appearing in multiple sources merged into one row with combined Source field", "done": false, "mandatory": true},
         {"action": "for each RETRO_GATE_VIOLATION recorded in stage 2: backfill the missing PR retro by posting via gh pr comment <N> --body-file <retro>", "done": false, "mandatory": true},
         {"action": "for each tracker_row finding from stage 3.5: replace the prose Action taken: line in RETRO.md with 'Open — tracked in Action Tracker #N (GitHub #NNN)' using the actual numbers", "done": false, "mandatory": true},
+        {"action": "rule rows (ADR-0004): append this milestone's PRs to fired:/re-violated: from the per-PR retros' classified findings; append matching rows to each docs/patterns/<class>.md instance table; file HARDEN rows from stage 3.7", "done": false},
         {"action": "output ACTION_TRACKER_UPDATED with counts (rows added, issues created, rows closed, retros backfilled)", "done": false, "mandatory": true}
       ]
     },
