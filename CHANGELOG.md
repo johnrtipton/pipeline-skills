@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- ADR-0004 (Proposed): apply WikiSkill (arXiv 2608.27454) to the family — split
+  consumer canon into a `docs/patterns/` wiki + a rule-sheet `CLAUDE.md`, extend
+  the Action Tracker into a skill-impact tracker (pattern / fired / re-violated),
+  add a `pipeline-retro` Stage 3b that KEEPs / HARDENs / DEMOTEs rules on measured
+  impact, narrow subagent briefs to the patterns in play, and add `PURPOSE.md`
+  per skill. Gives ROADMAP #77 a concrete mechanism.
 - Pluggable agent backends — the harness can now drive **OpenCode** in addition
   to Claude Code. New `--agent {claude,opencode}` / `--agent-model` flags,
   `PIPELINE_AGENT` env var, and CLAUDE.md `pipeline_agent:` config (resolution
