@@ -5,7 +5,19 @@
   "environment": {
     "smoke_test": null,
     "venv_check": true,
-    "dependency_command": null
+    "dependency_command": null,
+    "isolation": {
+      "why": "Fill in if the project installs editable into a shared venv (see profiles/django.json).",
+      "run_prefix": null,
+      "verify": null,
+      "worktree_setup": [],
+      "do_not_symlink": []
+    },
+    "regenerate": {
+      "command": null,
+      "artifacts": [],
+      "why": "Command that rebuilds generated artifacts after a merge; regenerate, never hand-merge."
+    }
   },
   "security_patterns": [
     "hardcoded secrets, API keys, or passwords",
@@ -26,5 +38,22 @@
     "changelog": true,
     "changelog_file": "CHANGELOG.md",
     "gallery_support": false
+  },
+  "merge": {
+    "method": null,
+    "admin_authorized": false,
+    "why": "squash | merge | rebase; whether --admin is sanctioned"
+  },
+  "completion": {
+    "artifacts": [
+      "every matrix-row issue is CLOSED",
+      "the bucket's matrix rows are struck through",
+      "RETRO.md has an entry for the bucket"
+    ],
+    "why": "Read by gate_retro_coverage."
+  },
+  "test": {
+    "gate_off_required": true,
+    "why": "A regression test proves nothing until it has been shown RED without the fix."
   }
 }
