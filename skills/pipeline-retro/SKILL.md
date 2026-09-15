@@ -407,6 +407,67 @@ If a retro is interrupted (context limit, crash, Ctrl+C), the state file
 persists on disk. Run `/pipeline-retro --resume` to pick up from the last
 incomplete stage.
 
+## Backfill Mode (retroing a bucket that was never retro'd)
+
+Reached when `/pipeline-retro` finds a bucket that is complete but has no
+`RETRO.md` entry — the condition `gate_retro_coverage` reports. This mode exists
+because the per-milestone template below **cannot be filled honestly** once the
+per-PR retros are gone, and an executor with no guidance will either fabricate
+the numbers or stall.
+
+### 1. Establish the buckets and their completion
+
+A bucket is complete when every issue in its ROADMAP matrix is CLOSED **and** its
+matrix rows are struck through. Confirm both — a bucket whose rows were never
+struck is invisible to every reader, human or script, including
+`gate_retro_coverage` (measured: on the djust v1.2.0-6 backfill the gate could
+see 6 of 14 drifted buckets for exactly this reason).
+
+### 2. Attribute PRs the reliable way
+
+Use each issue's `closedByPullRequestsReferences`, not issue mentions in PR
+bodies:
+
+```bash
+gh issue list --state all --limit 1000 --json number,state,closedByPullRequestsReferences
+```
+
+One call, exact attribution. **Mention-matching over-collects badly** — it
+attributed 128 PRs to a bucket with 3, because PR bodies cross-reference issues.
+
+### 3. Measure the evidence before promising an entry
+
+For each PR: does it carry a Retrospective comment (`gh pr view <n> --json comments`)?
+The count decides what you can write:
+
+| per-PR retros | what you may produce |
+|---|---|
+| most PRs have one | a normal milestone entry — findings and stats are recoverable |
+| some have one | findings from the surviving review/retro text; **Review Stats marked partial** |
+| few have one | findings only; **Review Stats recorded as NOT RECONSTRUCTIBLE** |
+
+### 4. Never estimate the missing numbers
+
+If Review Stats cannot be sourced, write **"Not reconstructible — deliberately
+not estimated"** and say why. A retro that invents a 🔴/🟡 count is worse than a
+retro with a hole in it: the hole is visible and the number is not. State the
+measured counts you *do* have (issues, PRs, retros available) so the reader can
+see the boundary between what was measured and what was not.
+
+### 5. Record the gate violations, and prefer one entry per bucket
+
+Per-PR retros that do not exist are `RETRO_GATE_VIOLATION`s — record them; the
+backfill is the retro for those PRs. Give **each bucket its own `## vX.Y.Z-N`
+heading** even when the analysis is thin and shared: `gate_retro_coverage` matches
+per-bucket headings, a single consolidated entry does not satisfy it, and the next
+reader looking for that bucket's history will grep for its name.
+
+### 6. The findings still need actions
+
+Stage 3.5's `prose_only` gate applies unchanged. Backfilled findings are usually
+`closed` (canonicalized since, with the reference) or `tracker_row` (still open,
+needs an issue). "We recorded what happened" is not an action.
+
 ## Reconcile Mode (`--reconcile`)
 
 Scan all tracking locations and reconcile:
