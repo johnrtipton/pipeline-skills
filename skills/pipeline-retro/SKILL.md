@@ -36,6 +36,7 @@ the actions the prose calls for.
 | GitHub PR comments | Per-PR retrospectives (the other input source — `gh pr view <N> --json comments`) |
 | `.pipeline-state/retro-<milestone>.json` | This pipeline's state file — checklist + classifications + tracker rows + issue numbers |
 | GitHub Issues (`tech-debt` label) | Filed for each new Action Tracker row |
+| `docs/patterns/<class>.md` | The pattern wiki (ADR-0004) — instance tables Stage 3.7 reads; never rolled back |
 
 ## The Action Tracker
 
@@ -68,6 +69,26 @@ issue or be explicitly closed with a reason.
 - Close items with a reason, don't delete them
 - OUT-OF-REPO rows must document the upstream repo + issue in the Notes column
 - Deduplicate: if the same item appears in multiple retros, keep one row with all sources
+
+### Rule rows — the skill-impact tracker (ADR-0004)
+
+A row whose Action introduced a canon rule or a gate (a `CLAUDE.md` rule
+line, a checklist row, a pre-push script, a pipeline-template mandatory
+item) is a **rule row** and carries three more fields in its Notes column,
+in this exact shape so Stage 3.7 can parse them:
+
+```
+pattern: <class>  fired: #NNN, #NNN  re-violated: #NNN
+```
+
+- `pattern` — the `docs/patterns/<class>.md` page the rule serves.
+- `fired` — PRs where the per-PR retro says the rule caught something.
+- `re-violated` — PRs where the class recurred with the rule in force.
+
+Stage 4 step 7 maintains the two PR lists every milestone. A rule row with
+several `re-violated` entries and few `fired` entries is a rejected
+proposal — Stage 3.7 turns that into a `HARDEN` decision rather than
+leaving it to be re-noticed in prose.
 
 ## How the state file drives the retro
 
@@ -175,6 +196,7 @@ Synthesize across PRs; don't just list each PR's findings separately.)
 | 🟡 Findings | N | N | | N |
 | Findings fixed | N | N | | N |
 | CI failures | N | N | | N |
+| Findings by pattern class | `parallel-path-drift`×2, `new`×1 | … | | |
 
 ### Process Improvements Applied
 
@@ -188,6 +210,12 @@ Synthesize across PRs; don't just list each PR's findings separately.)
 - [ ] Item 1 — tracked in Action Tracker #N (GitHub #NN)
 - [ ] Item 2 — tracked in Action Tracker #N (GitHub #NN)
 ```
+
+The **Findings by pattern class** row is the validation data Stage 3.7
+gates on. It comes straight from the per-PR retros, which list every
+🔴/🟡 finding with the class the reviewer tagged it with (or `new`).
+For every `new`, create `docs/patterns/<class>.md` from the template
+before Stage 3.7 — a `new` that reaches the gate is a synthesis gap.
 
 Record the `findings` list in the state file (one entry per finding with
 title and `action_taken_text`). Output `MILESTONE_ENTRY_DRAFTED`.
@@ -225,6 +253,38 @@ advance to stage 4. Fix one of three ways:
    belong in **Insights**, not in **What We Learned**.
 
 Output `GATE_PASSED` or `GATE_FAILED <indices>`.
+
+### Stage 3.7 — Gate the rule sheet (KEEP / HARDEN / DEMOTE)
+
+The fourth WikiSkill role (ADR-0004). Every other stage adds knowledge;
+this one is the only place a rule can leave the rule sheet. Skip it (output
+`RULE_GATE_SKIPPED no docs/patterns/`) only when the repo has no pattern
+directory yet.
+
+For every rule row (see *Rule rows* above) whose rule has been in force for
+at least two milestones:
+
+1. Open `docs/patterns/<class>.md` and count, for this milestone and the
+   prior one, instances marked `yes, missed` (**missed**) and `yes, fired`
+   (**fired**). Cross-check against the row's `fired:` / `re-violated:`
+   lists — they must agree; fix whichever is stale.
+2. Decide, and write the decision into the row's Notes as
+   `gate vX.Y.Z: KEEP|HARDEN|DEMOTE`:
+
+   | decision | condition | effect |
+   |---|---|---|
+   | `KEEP` | fired > 0 and missed not rising | none |
+   | `HARDEN` | missed ≥ 2 with the rule in force | prose did not work. File a tracker row + GitHub issue proposing a **mechanical** gate (test, grep, script, checklist row) chosen via `CANON.md`'s ladder, citing the pattern page. Mark the page `candidate for mechanical gate: yes`. |
+   | `DEMOTE` | fired = 0 and missed = 0 for two consecutive milestones | remove the rule's line from the rule sheet (`CLAUDE.md`); set the page's Status to `wiki-only`. The page is never deleted. |
+
+3. A rule already demoted once that would demote again is **deleted** from
+   the rule sheet; the page stays as history.
+4. `--dry-run` (the default the first time this stage runs in a repo):
+   print every decision and change nothing; record `rule_gate_dry_run: true`
+   in the state file. Apply on the next milestone.
+
+Record `rule_gate_decisions` in the state file (class → decision). Output
+`RULE_GATE_DONE <keep>/<harden>/<demote>` or `RULE_GATE_DRY_RUN <counts>`.
 
 ### Stage 4 — Update the Action Tracker
 
@@ -268,6 +328,12 @@ For each milestone retro entry:
 6. **Backfill missing PR retros** — for each `RETRO_GATE_VIOLATION` from
    stage 2, post the backfill via `gh pr comment <N> --body-file <retro>`.
 
+7. **Update rule rows** — for every rule row, append this milestone's PRs
+   to `fired:` / `re-violated:` from the per-PR retros' classified
+   findings, and append the matching `yes, fired` / `yes, missed` rows to
+   the pattern page's instance table. Apply any `HARDEN` rows Stage 3.7
+   produced (they are new tracker rows + issues, same as step 2).
+
 Output `ACTION_TRACKER_UPDATED <counts>`.
 
 ### Stage 4.5 — Re-verify Action taken: lines
@@ -295,6 +361,7 @@ BASE=$(sed -n 's/^- *default_branch: *//p' CLAUDE.md 2>/dev/null | awk 'NR==1{pr
 [ -z "$BASE" ] && BASE=main
 git add RETRO.md
 # plus any CLAUDE.md / PR-checklist / skill files updated as `diff` or `skill_update` actions
+git add docs/patterns/ 2>/dev/null   # instance-table rows + any stub pages from `new` findings (ADR-0004)
 git commit -m "docs(retro): milestone vX.Y.Z + action tracker update"
 git log -1 --oneline   # Action #122 — verify commit landed with expected message
 git push origin "$BASE"

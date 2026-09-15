@@ -81,6 +81,7 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {"action": "patterns in play (ADR-0004): if docs/patterns/ exists, list the pages this task touches in the plan (or 'none'); implementer/reviewer briefs get only those pages", "done": false},
         {
           "action": "read codebase for current state",
           "done": false
@@ -361,8 +362,9 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-plan.md for the original plan. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists \u2014 use as review framework. Step 2: Cross-ref plan vs implementation \u2014 verify every planned deliverable was implemented. Step 2b: Cross-ref the plan's test list against actual test files \u2014 every test the plan specified must exist. Step 3: Review for correctness, security (XSS, injection, secrets exposure), testing gaps, code quality (print vs logging, except:pass), docs, perf, architecture. Flag auto-reject triggers. Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict. Step FINAL (MANDATORY, #36): you are read-only \u2014 restore the executor's working tree before returning. Capture your starting branch first (START=$(git rev-parse --abbrev-ref HEAD)); on exit run `git checkout \"$START\"` and verify `git status --porcelain` is clean (`git restore --staged --worktree .` + `git clean -fd` (remove untracked files you created) if you dirtied it). NEVER leave the tree on {pr_target_branch} or with reverted/staged files \u2014 a build/scp the executor runs next would ship stale content.",
+      "subagent_prompt": "You are reviewing PR #{pr_number}. Project: {project_path}. PR targets {pr_target_branch}. Step 0: Read .pipeline-state/*-plan.md for the original plan. Step 1: Run git diff {pr_target_branch}...HEAD, read changed files. Check docs/PULL_REQUEST_CHECKLIST.md if exists \u2014 use as review framework. Step 2: Cross-ref plan vs implementation \u2014 verify every planned deliverable was implemented. Step 2b: Cross-ref the plan's test list against actual test files \u2014 every test the plan specified must exist. Step 3: Review for correctness, security (XSS, injection, secrets exposure), testing gaps, code quality (print vs logging, except:pass), docs, perf, architecture. Flag auto-reject triggers. Step 3b (ADR-0004): tag every critical/warning finding with [class: <pattern>] from docs/patterns/README.md ([class: new] if none fits; [class: n/a] if the repo has no docs/patterns/). Step 4: Run project test suite, report pass/fail. Step 5: Decide APPROVE/REQUEST_CHANGES/COMMENT. Step 6 MANDATORY: Post review to GitHub with gh pr review {pr_number} --comment --body '<formatted review with checklist>'. If REQUEST_CHANGES use --request-changes. Save to pr/feedback/ if dir exists. Step 7: Output verdict. Step FINAL (MANDATORY, #36): you are read-only \u2014 restore the executor's working tree before returning. Capture your starting branch first (START=$(git rev-parse --abbrev-ref HEAD)); on exit run `git checkout \"$START\"` and verify `git status --porcelain` is clean (`git restore --staged --worktree .` + `git clean -fd` (remove untracked files you created) if you dirtied it). NEVER leave the tree on {pr_target_branch} or with reverted/staged files \u2014 a build/scp the executor runs next would ship stale content.",
       "checklist": [
+        {"action": "tag every critical/warning finding with [class: <pattern>] from docs/patterns/README.md, [class: new] if none fits, [class: n/a] if the repo has no docs/patterns/ (ADR-0004)", "done": false},
         {
           "action": "read .pipeline-state/<branch>-plan.md for plan compliance check",
           "done": false
@@ -460,8 +462,9 @@
       "status": "pending",
       "verdict": null,
       "run_as": "subagent",
-      "subagent_prompt": "Write retrospective for feature: {task_description}. Project: {project_path}. PR #{pr_number}. Run 'gh pr view {pr_number} --json commits,title,body' to get PR details (branch deleted after merge). Rate quality 1-5, what went well, lessons learned, improvements. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Your FINAL output line MUST be exactly 'RETRO_COMPLETE'.",
+      "subagent_prompt": "Write retrospective for feature: {task_description}. Project: {project_path}. PR #{pr_number}. Run 'gh pr view {pr_number} --json commits,title,body' to get PR details (branch deleted after merge). Rate quality 1-5, what went well, lessons learned, improvements. Findings by pattern class (ADR-0004): list each review finding's [class: ...] tag as fired|missed; for any 'new', create docs/patterns/<class>.md from docs/patterns/TEMPLATE.md if the directory exists. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed, ensure in .gitignore). Your FINAL output line MUST be exactly 'RETRO_COMPLETE'.",
       "checklist": [
+        {"action": "findings by pattern class (ADR-0004): list each review finding's [class: …] as fired|missed; stub docs/patterns/<class>.md for any 'new'", "done": false},
         {
           "action": "rate quality 1-5",
           "done": false

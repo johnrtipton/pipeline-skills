@@ -542,6 +542,24 @@ guess:
   it is gitignored is not a defect — verify with `git check-ignore`
   before flagging an absent file.
 
+### Patterns in play (the wiki access rule, ADR-0004)
+
+If the repo has `docs/patterns/`, the Stage 4 plan names the pattern pages
+the task touches under **patterns in play**. The reviewer brief includes
+those pages inline, plus the *Detection* section of every page whose index
+row says `candidate for mechanical gate: yes` — those are the classes prose
+has already failed to prevent, so they get the reviewer's attention on
+every PR. Nothing else from `docs/patterns/` goes in the brief; the planner
+and the retro read the whole directory, the reviewer does not.
+
+**Every 🔴/🟡 finding is tagged with a pattern class** from
+`docs/patterns/README.md`, written as `[class: <name>]` on the finding's
+first line, or `[class: new]` when no row fits (the retro author stubs the
+page). Repos without `docs/patterns/` write `[class: n/a]`. The tag is one
+word per finding and is what makes the milestone retro's rule gate
+(`/pipeline-retro` Stage 3.7) computable — an untagged finding is invisible
+to it.
+
 ### Review Categories
 
 **Correctness**:
@@ -601,7 +619,7 @@ Flag as critical if any of these are found:
 - Placeholder/stub code shipped as production
 - Additional auto-reject triggers from the pipeline profile
 
-For each finding, include: file and line number, severity (critical/warning/suggestion), description, suggested fix.
+For each finding, include: file and line number, severity (critical/warning/suggestion), `[class: <pattern>]` (see *Patterns in play*), description, suggested fix.
 
 ### Post Review to GitHub PR
 
@@ -627,7 +645,7 @@ gh pr review <pr_number> --comment --body "$(cat <<'REVIEW'
 <one paragraph summary>
 
 ### Findings
-<categorized findings with file:line references>
+<categorized findings with file:line references; each 🔴/🟡 starts with [class: <pattern>]>
 
 ### Checklist
 - [x] Tests pass
@@ -757,6 +775,13 @@ Review the pipeline execution and provide feedback for continuous improvement.
 4. What could improve? (prompt quality, stage ordering, quality gates)
 5. Lessons learned — insights about the codebase, architecture, or process
 6. Suggest follow-up tasks if needed
+6b. **Findings by pattern class** (ADR-0004) — list every 🔴/🟡 the Code
+    Review posted with its `[class: …]` tag, and for each rule that was in
+    force say whether it **fired** (caught the finding) or was **missed**
+    (the class recurred). For every `[class: new]`, create
+    `docs/patterns/<class>.md` from `docs/patterns/TEMPLATE.md` (if the repo
+    has the directory) with this PR as the origin row. This list is what the
+    milestone retro's Stage 3.7 gate counts.
 7. Output improvement ideas as `IDEA:` lines — one per line:
    ```
    IDEA: Add retry backoff to reduce flaky test failures
@@ -815,6 +840,8 @@ gh pr comment <pr_number> --body "$(cat <<'RETRO'
 **What went well**: <summary>
 
 **Lessons learned**: <summary>
+
+**Findings by pattern class**: <class: fired|missed, …> (or `none`)
 
 **Suggested improvements**: <IDEA lines>
 RETRO

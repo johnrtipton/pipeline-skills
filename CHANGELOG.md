@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- ADR-0004 (Accepted): apply WikiSkill (arXiv 2608.27454) to the family — split
+  consumer canon into a `docs/patterns/` wiki + a rule-sheet `CLAUDE.md`, extend
+  the Action Tracker into a skill-impact tracker (pattern / fired / re-violated),
+  add a `pipeline-retro` Stage 3b that KEEPs / HARDENs / DEMOTEs rules on measured
+  impact, narrow subagent briefs to the patterns in play, and add `PURPOSE.md`
+  per skill. Gives ROADMAP #77 a concrete mechanism.
+- Skill-side implementation of ADR-0004: `CANON.md` "Compacting canon" section
+  (lifecycle table + how to compact an existing `CLAUDE.md`); `docs/patterns/`
+  index + page template for the family's own 14 guarded classes;
+  `pipeline-retro` Stage 3.7 (KEEP / HARDEN / DEMOTE, dry-run first) + rule-row
+  `pattern:/fired:/re-violated:` fields + Stage 4 step 7 + `retro-state.json`
+  stage; `pipeline-shared` Code Review "Patterns in play" + `[class: …]` tag on
+  every 🔴/🟡 finding + Retrospective step 6b; `pipeline-run` wiki-access rule
+  for subagent prompts + review-quality tag requirement; `patterns in play` /
+  classification / findings-by-class checklist items and prompt steps in the
+  feature, bugfix, refactor and ship templates; `PURPOSE.md` for pipeline-run,
+  pipeline-retro, pipeline-shared and pipeline-ship (every anchor and origin
+  grep-verified at generation time); `install.sh` copies `PURPOSE.md`.
 - `gate_retro_coverage` — a new executable gate: every COMPLETED drain bucket must have a
   `RETRO.md` entry. Closes the hole `gate_retro_artifact` leaves open — that gate checks a
   PR, and a bucket is a milestone. Measured against the case that motivated it: a consumer
