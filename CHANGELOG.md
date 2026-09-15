@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `gate_retro_coverage` — a new executable gate: every COMPLETED drain bucket must have a
+  `RETRO.md` entry. Closes the hole `gate_retro_artifact` leaves open — that gate checks a
+  PR, and a bucket is a milestone. Measured against the case that motivated it: a consumer
+  had 14 buckets complete-and-un-retro'd, and a *previous* backfill (#2140) had already been
+  done for the same reason, so the gap recurs. The gate's known limitation is in its header:
+  it can only see buckets whose ROADMAP matrix rows were struck through.
+- Worktree-parallelism guidance in `pipeline-run` (extends #74) — the two limits the
+  one-checkout rule does not cover: concurrency is capped by the shared usage **quota**
+  (three parallel pipelines on a consumer drain died at the same step, before spawning their
+  reviewers, leaving PRs CI-green and unreviewed), and a worktree branch goes **stale against
+  sibling merges**, conflicting in *generated* artifacts. Includes the editable-install
+  isolation trap: `PYTHONPATH` must be pinned to the worktree and *verified*, or tests
+  silently exercise the main checkout.
+- `/pipeline-retro` **Backfill Mode** — retroing a bucket that was never retro'd: reliable PR
+  attribution (`closedByPullRequestsReferences`, not issue mentions — mention-matching
+  attributed 128 PRs to a 3-PR bucket), an evidence-availability table, and the rule that
+  Review Stats are recorded as **"not reconstructible"** rather than estimated.
+- Profile schema additions (extends #75) — `environment.isolation`,
+  `environment.regenerate`, `merge`, `completion.artifacts`, `test.gate_off_required`, plus a
+  mandatory gate-off item on the test stage; and `profiles/README.md` documenting every key
+  with the rule that a new key goes into *every* profile so the schema stays uniform.
+
 - Pluggable agent backends — the harness can now drive **OpenCode** in addition
   to Claude Code. New `--agent {claude,opencode}` / `--agent-model` flags,
   `PIPELINE_AGENT` env var, and CLAUDE.md `pipeline_agent:` config (resolution

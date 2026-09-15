@@ -51,6 +51,22 @@ _No active milestone. See `## Completed` for v0.8.0._
   10. **Canon-compaction guidance in CANON.md** (#77) — downstream `CLAUDE.md` reached 1,543 lines across 25 "process canonicalizations from *X* retro arc" sections. The ladder's weakest venue accumulates the most; CANON.md should say how to graduate or compact a section rather than only how to choose a venue.
   11. **Executor eval fixtures** (#78) — a fixtures directory of state files at various stages, replayed to assert the executor refuses to advance past unticked mandatory items. Complements the SKILL.md self-test above.
 
+  12. **Gate-off evidence as a first-class artifact** (#82) — a regression case must be
+      shown RED on the revision that carried the defect. The highest-value technique on the
+      v1.2.0-6 drain (per-revision red/green matrices), and the thing that caught a case
+      which pressed a NON-matching key and therefore could never fail.
+  13. **Claim checks for changelog fragments and PR bodies** (#83) — the family checks docs,
+      not the prose written *about* a change. A false changelog claim ("`dj-key` is the
+      documented way to restrict a handler") became the premise for a code change and caused
+      a regression; five more instances shipped past review.
+
+  **Partly implemented** on `feat/drain-feedback-djust-v1.2.0-6`: #74's worktree guidance
+  (the two limits the checkout rule does not cover + the editable-install isolation trap),
+  #8/#68 extended to the MILESTONE level by `gate_retro_coverage`, the profile fields behind
+  #75 (`environment.isolation`, `environment.regenerate`, `merge`, `completion.artifacts`,
+  `test.gate_off_required`), and a `/pipeline-retro` backfill mode for buckets whose per-PR
+  retros have decayed.
+
   Already captured in the working tree from the same source (pending commit): the `gh issue create` URL-parse trap (`pipeline-drain`, `pipeline-retro`), the ROADMAP duplicate-heading drift guard (`pipeline-drain`), and the pre-commit unstaged-work-preservation reflex (`pipeline-run`, from djust Action #292).
 
 ## Contributing
