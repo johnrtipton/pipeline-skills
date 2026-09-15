@@ -2,7 +2,8 @@
 
 One row per failure class the pipeline family guards against. Each row's
 rule is the line a rule sheet carries; the page (when one exists) holds the
-instance table, detection and rejected shapes. Template:
+instance table, detection and rejected shapes. Each class's page lives at `docs/patterns/<class>.md` once written; a row without a
+page is a class someone named but has not yet collected instances for. Template:
 [TEMPLATE.md](TEMPLATE.md). Lifecycle: [CANON.md](../../CANON.md#compacting-canon-the-pattern-wiki-and-the-rule-sheet-adr-0004).
 
 This index is also what `skills/*/PURPOSE.md` point at, so a gate with no
@@ -23,4 +24,6 @@ row here is a gate with no living pattern behind it.
 | `prose-only-action` | A retro finding's `Action taken:` is a diff, a skill edit, a tracker row or a close — never the prose itself. | skill · `pipeline-retro` Stage 3.5 gate | — |
 | `stale-base-review` | Reviewing a branch behind its base reviews a different program than the merge applies; three-dot diff, rebase first. | skill · `pipeline-shared` Code Review premises, `pipeline-ship` Stage 1 | — |
 | `scope-creep-lint` | Leave pre-existing lint untouched in a security/lint pass; fix what the task cites. | skill · `pipeline-shared` Security Check | #5 |
+| `unverified-claim` | Open the file and cite the path (and line) before writing any claim about what the code or docs contain. | skill · none (proposed: upstream #83) | djust #2838 |
+| `fix-reproduces-own-bug` | Enumerate every caller's invariant of the shared state a fix touches before the first edit. | skill · none (proposed: upstream #82) | djust #2147 |
 | `ineffective-rule` | A rule that keeps being re-violated is a rejected proposal; harden it into a gate or demote it. | skill · `pipeline-retro` Stage 3.7 | ADR-0004 |
