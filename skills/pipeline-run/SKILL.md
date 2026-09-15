@@ -95,6 +95,60 @@ iters 5-7 of the same drain.
 its own `git worktree add` directory) or different repositories. The rule
 is one-checkout = one-agent.
 
+### Worktree parallelism: two limits the checkout rule does not cover
+
+Worktrees solve *checkout* contention only — the class `parallel-agent-contention`
+tracks. Two further limits, both measured on the djust v1.2.0-6 drain (2026-09-15,
+three concurrent worktree pipelines — PRs #2843, #2844, #2846). The first extends
+ROADMAP candidate **#74 (concurrency guidance)**; the second is the class
+`stale-base-review` reached through a worktree:
+
+1. **Concurrency is capped by the shared usage quota, not by the number of
+   worktrees.** Three parallel pipelines exhausted the account's 5-hour usage quota
+   fast enough that all three implementer agents died at the same step — immediately
+   before spawning their own Code Review reviewer — and their PRs reached CI-green
+   *unreviewed*. Fresh-context review is the pipeline's main quality mechanism, so
+   losing it costs more than the parallelism buys. **Cap at one or two concurrent
+   pipeline worktrees.** If an agent dies mid-task, expect the executor to finish that
+   PR by hand: review it inline and **say so in the posted review** — an inline review
+   is weaker than a fresh-context one, and the artifact must admit that rather than
+   implying the pipeline's normal independence.
+
+2. **A worktree branch goes stale against sibling merges.** Branches cut from
+   `origin/main` before the milestone's other PRs land become merge blockers later: on
+   this drain all three conflicted in *generated* artifacts (`client.js`,
+   `client.min.js`, `client-sizes.json`, plus a `CLAUDE.md` size claim) while their
+   source diffs stayed clean. `git merge-tree --write-tree origin/main HEAD` reveals
+   this before the PR is opened. **Merge `origin/main` into each worktree branch
+   EARLY** — while it is still one or two files and the merge is trivially
+   conflict-free — and resolve generated-artifact conflicts by **regenerating** them
+   (`bash scripts/build-client.sh`), never by hand-merging.
+
+**Worktree setup.** Three things a fresh `git worktree add` does NOT carry, because
+they are gitignored: the dependency tree (symlink `node_modules`), any compiled
+extension (copy it — e.g. `<pkg>/_rust.cpython-3XX-*.so`), and the state directory
+(`mkdir .pipeline-state`).
+
+**The isolation trap, which is silent and therefore the worst kind.** If the project is
+installed editable into a shared venv, the `.pth` points at the MAIN checkout, so a bare
+`import <pkg>` inside a worktree resolves to the main source and the tests exercise code
+that is not the branch under test — green results about the wrong program. Pin the
+import path to the worktree and *prove it* before trusting any number:
+
+```bash
+cd "$WT"
+PYTHONPATH="$WT/python" "$MAIN/.venv/bin/python" -c \
+  "import pkg; print(pkg.__file__)"   # MUST print a path under $WT
+```
+
+`PYTHONPATH` precedes `site-packages`/`.pth` entries on `sys.path`, so it wins; copying
+the compiled extension is still required separately, since `PYTHONPATH` cannot supply a
+missing binary. Do not symlink a large build cache (`target/`, 29G in the djust case)
+across worktrees — concurrent builds collide there.
+
+Canonicalized from the djust v1.2.0-6 drain (2026-09-15); extends ROADMAP candidate #74
+and the `parallel-agent-contention` / `stale-base-review` classes.
+
 Canonicalized from v0.9.1 retro / Action Tracker #180 / GitHub #1172.
 
 ## Stage 1: Branch and Environment Setup
@@ -982,3 +1036,52 @@ at any time if they want to review.
 ## Why This Works
 
 This skill is deliberately tiny — just the loop logic. All stage details (checklists, subagent prompts, mandatory flags) live in the state file on disk, not in this skill's text. The state file is re-read from disk at each iteration, so context compression can never lose the remaining stages.
+
+## Velocity rules (djust 2026-09-02 — one checkout is not enough)
+
+Three failure modes cost a v1.2.0 drain most of a day: one Rust row held the
+only usable checkout for six hours while other rows queued; every push re-ran
+the full ten-minute suite (three pushes for one PR); and agents parked after
+their own background jobs finished, each nudge costing 10–20 minutes.
+
+1. **Per-worktree environments.** A Rust row runs in its own `git worktree`
+   with its OWN venv and extension: `make worktree-env` (creates `./.venv`
+   from `requirements-dev.txt` without `uv`, then `maturin develop --release`).
+   Cargo's `target/` is already per-checkout. Never build from a worktree into
+   the main venv — `maturin develop` repoints the shared `djust.pth` and every
+   test on the main checkout silently imports the worktree. With this in place
+   the one-implementer-per-checkout rule (#180) permits ~3 Rust rows in
+   parallel (rate-limit cap, #1961).
+2. **The full suite runs twice per PR, not per push.** Stage 6 (Test
+   Execution) owns the one local full run; CI is the second. The pre-push hook
+   runs lint plus a SELECTED test set (`scripts/select-tests.py`: changed test
+   files, tests importing changed modules, tests whose text names a changed
+   Rust file — the source-pin class — and the full suite only when core /
+   config / `conftest` files change or the branch is a routing flip).
+   Implementers and fixers run targeted files only (#2526).
+3. **Never park.** Every subagent brief carries: "block on your own long jobs
+   in the foreground with an adequate timeout; do not arm a monitor and go
+   idle — an idle agent is invisible to the orchestrator until nudged."
+4. **Conformance rows use `conformance-state.json`.** A row scored by a
+   family of Django-suite cells is one family, one implementation loop
+   (measure with the runner filtered to the family after each change, compare
+   against Django in-process, whole-suite `compare` = 0 regressions), one
+   adversarial review — not one plan + three reviews per tag. Order rows by
+   cells per PR.
+5. **Pushes come from the checkout whose tree is being tested.** The hook
+   tests the working tree, so a branch is pushed from the checkout it is
+   checked out in (a worktree with its own env is fine for docs-only and,
+   with rule 1, for code); pushing a branch that is checked out elsewhere
+   tests the wrong tree.
+
+### Changelog fragments (djust, from 2026-09-03)
+
+`CHANGELOG.md`'s `[Unreleased]` section is no longer edited by PRs. The
+Documentation-stage commit writes ONE fragment, `changelog.d/<issue>.<section>.md`
+(section ∈ added / changed / fixed / security / documentation / removed /
+deprecated), whose body is the bullet that would have gone under that heading.
+`scripts/changelog-fragments.py compile` folds fragments into `[Unreleased]`
+at the release cut. Gate 2 (docs-only commit) accepts `changelog.d/`. The
+test-count checker scans fragments. Rationale: six CHANGELOG conflicts in one
+drain day, each also suppressing the PR's CI run (a conflicting PR gets no
+`pull_request` run).

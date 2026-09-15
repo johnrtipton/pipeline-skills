@@ -2,13 +2,40 @@
   "name": "django",
   "description": "Django/Python projects — adds Django template security, pytest, and Python-specific checks",
   "detection": [
-    {"file": "manage.py"},
-    {"file": "pyproject.toml", "contains": "django"}
+    {
+      "file": "manage.py"
+    },
+    {
+      "file": "pyproject.toml",
+      "contains": "django"
+    }
   ],
   "environment": {
     "smoke_test": "python -c 'import django'",
     "venv_check": true,
-    "dependency_command": null
+    "dependency_command": null,
+    "isolation": {
+      "why": "The venv's editable install (.pth) points at the MAIN checkout, so in a git worktree a bare `import djust` resolves to the main source and the tests exercise code that is not the branch under test. Silent: green results about the wrong program.",
+      "run_prefix": "PYTHONPATH=\"$WORKTREE/python\" \"$MAIN/.venv/bin/python\"",
+      "verify": "import djust; print(djust.__file__)   # MUST print a path under $WORKTREE",
+      "worktree_setup": [
+        "ln -s $MAIN/node_modules $WORKTREE/node_modules",
+        "cp $MAIN/python/djust/_rust.cpython-3*-*.so $WORKTREE/python/djust/",
+        "mkdir -p $WORKTREE/.pipeline-state"
+      ],
+      "do_not_symlink": [
+        "target/  # 29G cargo cache; concurrent builds collide"
+      ]
+    },
+    "regenerate": {
+      "command": "bash scripts/build-client.sh",
+      "artifacts": [
+        "python/djust/static/djust/client.js",
+        "python/djust/static/djust/client.min.js",
+        "python/djust/static/djust/client-sizes.json"
+      ],
+      "why": "Generated artifacts conflict on every sibling merge. Regenerate them; never hand-merge. After regenerating, re-check the `~NNN KB` claim in CLAUDE.md (`make sizes`) — the pre-commit check-doc-snippets hook enforces it."
+    }
   },
   "security_patterns": [
     "mark_safe() with unescaped interpolated values — must use escape() or format_html()",
@@ -26,24 +53,76 @@
   ],
   "stage_additions": {
     "feature.4": [
-      {"action": "identify user-configurable values entering unescaped contexts (mark_safe, autoescape off, |safe, JS embedding) — plan input validation for each", "done": false}
+      {
+        "action": "identify user-configurable values entering unescaped contexts (mark_safe, autoescape off, |safe, JS embedding) — plan input validation for each",
+        "done": false
+      }
     ],
     "feature.5": [
-      {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml [tool.pytest.ini_options] testpaths)", "done": false, "mandatory": true},
-      {"action": "if generating code/templates: tests must assert on OUTPUT CONTENT (correct syntax, imports, patterns), not just 'it ran without error'", "done": false},
-      {"action": "if generating code/templates: verify generated output compiles/parses (python -c 'import ast; ast.parse(open(f).read())' or similar)", "done": false},
-      {"action": "no silent exception handling in generated/scaffolded code — use logging not bare except:pass", "done": false}
+      {
+        "action": "verify test file location is in project's pytest testpaths (check pyproject.toml [tool.pytest.ini_options] testpaths)",
+        "done": false,
+        "mandatory": true
+      },
+      {
+        "action": "if generating code/templates: tests must assert on OUTPUT CONTENT (correct syntax, imports, patterns), not just 'it ran without error'",
+        "done": false
+      },
+      {
+        "action": "if generating code/templates: verify generated output compiles/parses (python -c 'import ast; ast.parse(open(f).read())' or similar)",
+        "done": false
+      },
+      {
+        "action": "no silent exception handling in generated/scaffolded code — use logging not bare except:pass",
+        "done": false
+      },
+      {
+        "action": "gate-off: revert the fix, confirm each new test goes RED, restore, confirm GREEN — and record the red/green counts per revision in the PR body",
+        "done": false,
+        "mandatory": true
+      }
     ],
     "bugfix.3": [
-      {"action": "if fix involves user-configurable values in unescaped contexts (mark_safe, autoescape off, |safe, JS embedding), plan input validation", "done": false}
+      {
+        "action": "if fix involves user-configurable values in unescaped contexts (mark_safe, autoescape off, |safe, JS embedding), plan input validation",
+        "done": false
+      }
     ],
     "bugfix.4": [
-      {"action": "verify test file location is in project's pytest testpaths (check pyproject.toml)", "done": false, "mandatory": true}
+      {
+        "action": "verify test file location is in project's pytest testpaths (check pyproject.toml)",
+        "done": false,
+        "mandatory": true
+      }
+    ],
+    "bugfix.5": [
+      {
+        "action": "gate-off is mandatory (#1468): every regression case must be shown RED on the revision that carried the defect before the fix is claimed to work. A case that is green on the base revision pins nothing.",
+        "done": false,
+        "mandatory": true
+      }
     ]
   },
   "docs": {
     "changelog": true,
     "changelog_file": "CHANGELOG.md",
     "gallery_support": false
+  },
+  "merge": {
+    "method": "squash",
+    "admin_authorized": true,
+    "why": "main carries no merge commits for PRs; a PR author cannot approve their own PR, so drain PRs merge with `--admin` (the human reviews at the milestone level)."
+  },
+  "completion": {
+    "artifacts": [
+      "every matrix-row issue in the bucket is CLOSED",
+      "the bucket's matrix rows are struck through",
+      "RETRO.md has an entry for the bucket"
+    ],
+    "why": "The third one is what `gate_retro_coverage` checks. The second is its precondition: a bucket completed without striking its rows is invisible to every reader, human or script."
+  },
+  "test": {
+    "gate_off_required": true,
+    "why": "djust canon (#1468): a regression test proves nothing until it has been shown RED on the revision that carried the defect. Record the matrix (base / each intermediate / head) — it is what caught a case that pressed a NON-matching key and therefore could never fail."
   }
 }
