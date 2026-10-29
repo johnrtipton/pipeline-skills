@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Private profiles: `pipeline.py` searches `~/.config/pipeline-skills/profiles/`
+  (or `PIPELINE_PROFILES_DIR`) before `profiles/`, so a profile that encodes a
+  company's internal repos and process never ships in this public repo.
+- Data-driven profile detection: every profile's `detection` rules decide, the
+  highest new `detection_priority` first (`generic` 0, `django` 10). `django`
+  still matches `manage.py` or `django` in `pyproject.toml`; `pipeline_profile:`
+  in CLAUDE.md now accepts a hyphenated name.
+- `stage_replacements` profile key: replace a template checklist item, or text in a
+  subagent prompt, that must not run in a project (`stage_additions` can only add).
+- `scaffolding` profile key (`commit_to_repo`, `ignore_file`): with
+  `.git/info/exclude`, the harness ignores `.pipeline-state/` in the clone instead
+  of editing a team repo's `.gitignore`.
+- `pipeline.py ship` with `--init-only`, `--branch` and `--no-merge`: builds the
+  ship state file with the profile applied and exits. `/pipeline-ship` Step 0.6
+  now calls it, so skill-mode ship runs get profiles for the first time
+  (`--no-merge` marks Merge PR and Retrospective `skipped`).
+- `scripts/validate-profiles.sh` (`make validate-profiles`, part of `make check`):
+  every profile parses and has every key of `generic.json` (the profiles/README.md
+  rule), plus the shape of `detection`, `stage_additions` and `stage_replacements`.
+
 - ADR-0004 (Accepted): apply WikiSkill (arXiv 2608.27454) to the family — split
   consumer canon into a `docs/patterns/` wiki + a rule-sheet `CLAUDE.md`, extend
   the Action Tracker into a skill-impact tracker (pattern / fired / re-violated),

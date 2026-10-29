@@ -28,7 +28,8 @@ Use this when you've been coding interactively and want to formalize, review, an
 - `--description "text"` — Task description for the PR and state file. If omitted, auto-generate from the diff.
 - `--branch name` — Branch name. If omitted, derive from the current branch or auto-generate from the description.
 - `--target branch` — PR target branch (default: `main`).
-- `--no-merge` — Create the PR but do not merge. Stops after Code Review.
+- `--no-merge` — Create the PR but do not merge. Stops after Code Review. The state file marks stages 9 (Merge PR) and 10 (Retrospective) `skipped`.
+- `--profile name` — Use this profile instead of the detected one (see Step 0.6).
 - `--resume` — Resume an interrupted pipeline from the last incomplete stage.
 
 ## How It Works
@@ -86,11 +87,26 @@ Use this when you've been coding interactively and want to formalize, review, an
 5. Determine description:
    - If `--description` provided: use it
    - Otherwise: read the diff and generate a one-line summary
-6. Create state file:
-   - Read template from the pipeline plugin's `templates/ship-state.json` (locate via directory containing `pipeline.py`, or `PIPELINE_SKILL_DIR` env var). Project-local `.pipeline-templates/ship-state.json` overrides the default — see pipeline-next for the override convention.
-   - Fill in: `task_description`, `branch_name`, `pr_target_branch`, `project_path`, `started_at`
-   - Write to `.pipeline-state/<branch-name>.json`
-   - Ensure `.pipeline-state/` is in `.gitignore`
+6. Create state file — **let the harness build it**, so the project's profile applies
+   (detection, `stage_additions`, `stage_replacements`, security patterns, `scaffolding`):
+   ```bash
+   PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-ship)")")}"
+   python3 "$PIPELINE_DIR/pipeline.py" ship --init-only --project . \
+       --task "<description>" --branch "<branch>" --target-branch "<target>" \
+       [--no-merge] [--profile <name>]
+   ```
+   It prints `Profile: <name>` and `State file: <path>`. Read that file and say which profile applied.
+   Profiles come from `PIPELINE_PROFILES_DIR` (default `~/.config/pipeline-skills/profiles/`,
+   private, for repos whose details must not ship in this public repo), then `profiles/`.
+   - **Fallback** (no `python3` or no `pipeline.py`): read the template from `templates/ship-state.json`
+     in `$PIPELINE_DIR`. Project-local `.pipeline-templates/ship-state.json` overrides the default — see
+     pipeline-next for the override convention. Fill in `task_description`, `branch_name`,
+     `pr_target_branch`, `project_path`, `started_at`; with `--no-merge`, set stages 9 and 10 to
+     `"status": "skipped"`. Write it to `.pipeline-state/<branch-name>.json`. No profile applies, so
+     say so.
+   - Ignore `.pipeline-state/` where the profile's `scaffolding.ignore_file` says: `.gitignore` by
+     default, or `.git/info/exclude` for a repo the team owns (the harness does this). Never edit
+     `.gitignore` in such a repo, and never run `pipeline-init --apply` there.
 
 ### Step 1: Run the Stage Loop
 
