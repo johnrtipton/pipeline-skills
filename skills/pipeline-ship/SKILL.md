@@ -75,9 +75,27 @@ Use this when you've been coding interactively and want to formalize, review, an
    ```bash
    # If the inventory shows large deletions of files/sections your PR never touched, do NOT conclude it reverts them. Confirm:
    git diff "origin/$BASE...HEAD" --stat      # the real change set
-   git merge-tree "$(git merge-base HEAD "origin/$BASE")" HEAD "origin/$BASE" | grep -c '^<<<<<<<'   # 0 = clean merge
    ```
-   Observed cost: max-companion PR #10's Stage 1 ran a two-dot diff on a branch 3 commits behind `origin/main` and showed ~90 phantom deletions — including the pipeline-ship Pre-Merge Gate and pipeline-drain Step 8.5 — looking as if the PR *reverted those safety gates*. It did not (three-dot: 984/13, `merge-tree`: 0 conflicts). The danger runs both ways: a false "this PR reverts gates" abort, or — if the phantom deletions are waved off — merging something that *genuinely* reverts base content while the reviewer assumes they're phantom. Always three-dot; when in doubt, `merge-tree`.
+   Observed cost: max-companion PR #10's Stage 1 ran a two-dot diff on a branch 3 commits behind `origin/main` and showed ~90 phantom deletions — including the pipeline-ship Pre-Merge Gate and pipeline-drain Step 8.5 — looking as if the PR *reverted those safety gates*. It did not (three-dot: 984/13, `merge-tree`: 0 conflicts). The danger runs both ways: a false "this PR reverts gates" abort, or — if the phantom deletions are waved off — merging something that *genuinely* reverts base content while the reviewer assumes they're phantom. Always three-dot, and predict conflicts with `merge-tree --write-tree` (below).
+   **Predict merge conflicts with `--write-tree`** (git >= 2.38), never the old three-argument form:
+   ```bash
+   git fetch origin "$BASE" --quiet
+   OUT=$(git merge-tree --write-tree --name-only --no-messages HEAD "origin/$BASE"); RC=$?
+   case $RC in
+     0) echo "clean: HEAD merges into origin/$BASE without conflicts" ;;
+     1) echo "CONFLICTS with origin/$BASE — resolve before Stage 6:"; echo "$OUT" | tail -n +2 | sed 's/^/  /' ;;
+     *) echo "merge-tree --write-tree failed (git $(git --version | awk '{print $3}'); needs >= 2.38) — use the fallback" ;;
+   esac
+   ```
+   Exit 0 = clean, exit 1 = conflicts (the first output line is the merged tree's OID; the rest are the conflicted files), anything else = error. **Fallback for git < 2.38**: a trial merge in a throwaway worktree, which leaves your tree alone:
+   ```bash
+   T=$(mktemp -d) && git worktree add --quiet --detach "$T" HEAD
+   if git -C "$T" merge --no-commit --no-ff "origin/$BASE" >/dev/null 2>&1; then echo clean
+   else echo CONFLICTS:; git -C "$T" diff --name-only --diff-filter=U; fi
+   git worktree remove --force "$T"
+   ```
+   **Never** `git merge-tree <base> HEAD origin/$BASE | grep -c '^<<<<<<<'`: the three-argument (trivial-merge) form prints its conflict markers inside a diff, as `+<<<<<<< .our`, so the grep is 0 even when the real merge conflicts. It also does no rename detection, and shows a delete/modify conflict with no markers at all. Observed: it reported 0 on a branch whose merge into the base then conflicted.
+   On conflicts, merge `origin/$BASE` into the branch now and resolve them (regenerate generated artifacts, never hand-merge them: profile `environment.regenerate`). Stage 6 runs the same check before the push.
 3. Check for existing changes:
    - `git status -s` — must have modified/added/untracked files OR recent commits not on target
    - If no changes found, abort: "Nothing to ship."

@@ -96,15 +96,34 @@ def matches_detection(project_path: Path, rules: list[dict]) -> bool:
     return False
 
 
+# Profile lists merged with the more specific profile's entries first, de-duplicated.
+# apply_profile joins each into one checklist line; generic-first concatenation plus
+# a cap there once dropped half of a project profile's own patterns.
+SPECIFIC_FIRST_KEYS = ("security_patterns", "auto_reject_triggers")
+
+
+def specific_first(base: list, overlay: list) -> list:
+    """The overlay's entries, then the base's entries it does not already have."""
+    merged = []
+    for item in overlay + base:
+        if item not in merged:
+            merged.append(item)
+    return merged
+
+
 def deep_merge(base: dict, overlay: dict) -> dict:
-    """Deep merge overlay into base. Lists are concatenated, dicts are merged recursively."""
+    """Deep merge overlay into base. Lists are concatenated (``SPECIFIC_FIRST_KEYS``:
+    overlay first, de-duplicated), dicts are merged recursively."""
     result = base.copy()
     for key, value in overlay.items():
         if key in result:
             if isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = deep_merge(result[key], value)
             elif isinstance(result[key], list) and isinstance(value, list):
-                result[key] = result[key] + value
+                if key in SPECIFIC_FIRST_KEYS:
+                    result[key] = specific_first(result[key], value)
+                else:
+                    result[key] = result[key] + value
             else:
                 result[key] = value
         else:
@@ -339,20 +358,25 @@ def apply_profile(state: dict, profile: dict) -> dict:
                 checklist.insert(insert_idx + j, item)
             stage["checklist"] = checklist
 
-    # Inject security patterns into security check stages
+    # Inject security patterns into security check stages. Every pattern, no cap:
+    # load_profile puts the project's own first (SPECIFIC_FIRST_KEYS).
     security_patterns = profile.get("security_patterns", [])
     if security_patterns:
-        pattern_text = ", ".join(security_patterns[:10])
+        pattern_text = ", ".join(security_patterns)
         for stage in state["stages"].values():
             for item in stage.get("checklist", []):
                 if "scan changed files for security patterns" in item.get("action", ""):
                     item["action"] = f"scan changed files for: {pattern_text}"
 
-    # Inject auto-reject triggers into subagent prompts
+    # Inject auto-reject triggers into the checklist items that check them and
+    # into subagent prompts that carry a {profile_triggers} placeholder.
     auto_reject = profile.get("auto_reject_triggers", [])
     if auto_reject:
-        trigger_text = ", ".join(auto_reject[:10])
+        trigger_text = ", ".join(auto_reject)
         for stage in state["stages"].values():
+            for item in stage.get("checklist", []):
+                if item.get("action", "").startswith("check auto-reject triggers"):
+                    item["action"] = f"check auto-reject triggers: {trigger_text}"
             prompt = stage.get("subagent_prompt", "")
             if "auto-reject triggers" in prompt.lower() and "{profile_triggers}" in prompt:
                 stage["subagent_prompt"] = prompt.replace("{profile_triggers}", trigger_text)

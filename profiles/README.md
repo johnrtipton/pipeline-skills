@@ -37,8 +37,8 @@ its own profile even when it also uses a framework.
 | `merge` | **NEW** — `method` (`squash`\|`merge`\|`rebase`), `admin_authorized` (is bypass sanctioned?), `why` |
 | `completion.artifacts[]` | **NEW** — what "this bucket is done" means; read by `gate_retro_coverage` |
 | `test.gate_off_required` | **NEW** — must every regression case be shown RED without the fix? |
-| `security_patterns[]` | reviewer prompts |
-| `auto_reject_triggers[]` | shapes that fail a change outright |
+| `security_patterns[]` | reviewer prompts. The Security Check item lists every one, no cap: the most specific source first (`.pipeline/profile.json`, then the profile, then `generic`), each once |
+| `auto_reject_triggers[]` | shapes that fail a change outright. Merged the same way, into each `check auto-reject triggers` item (Self-Review, Code Review) |
 | `stage_additions` | `{"<type>.<stage-number>": [{action, done, mandatory?}]}`, merged into the state file |
 | `stage_replacements` | **NEW** — `{"<type>.<stage-number>": [{match, action, mandatory?, in?}]}`. Replaces the first template checklist item whose action contains `match`; with `"in": "subagent_prompt"` it swaps the `match` text inside the stage's subagent prompt instead. For a template step that must not run in the project (post the review, a plain `git push`): `stage_additions` can only add. A replacement that matches nothing prints a warning |
 | `scaffolding` | **NEW** — `commit_to_repo` (may pipeline-init commit its files?), `ignore_file` (`.gitignore` or `.git/info/exclude`: where `.pipeline-state/` and `.pipeline-log.md` are ignored), `why`. Use `false` and `.git/info/exclude` for a repo the team owns |

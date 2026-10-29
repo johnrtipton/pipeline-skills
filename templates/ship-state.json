@@ -206,6 +206,10 @@
           "done": false
         },
         {
+          "action": "git fetch origin; git merge-tree --write-tree --name-only HEAD origin/<pr_target_branch> \u2014 exit 0 = merges clean; exit 1 lists the conflicting files: merge the target in and resolve them before the PR (pipeline-ship Step 2.6; git < 2.38: its trial-merge fallback)",
+          "done": false
+        },
+        {
           "action": "commit with conventional prefix (feat:/fix:/refactor:/docs:/chore:)",
           "done": false,
           "mandatory": true
