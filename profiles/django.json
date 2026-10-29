@@ -10,6 +10,7 @@
       "contains": "django"
     }
   ],
+  "detection_priority": 10,
   "environment": {
     "smoke_test": "python -c 'import django'",
     "venv_check": true,
@@ -103,6 +104,7 @@
       }
     ]
   },
+  "stage_replacements": {},
   "docs": {
     "changelog": true,
     "changelog_file": "CHANGELOG.md",
@@ -124,5 +126,10 @@
   "test": {
     "gate_off_required": true,
     "why": "djust canon (#1468): a regression test proves nothing until it has been shown RED on the revision that carried the defect. Record the matrix (base / each intermediate / head) — it is what caught a case that pressed a NON-matching key and therefore could never fail."
+  },
+  "scaffolding": {
+    "commit_to_repo": true,
+    "ignore_file": ".gitignore",
+    "why": "djust commits .pipeline-templates/ and ignores the per-checkout files in .gitignore."
   }
 }

@@ -304,6 +304,13 @@ DETECTION RECORD
 
 ### 2. Create directories and gitignore (`--apply`)
 
+**Team-owned repo guard (first):** if a profile matches this repo (a private one in
+`~/.config/pipeline-skills/profiles/` included — `pipeline.py ship --init-only` prints
+`Profile: <name>`, or read the profile files' `detection` rules) and its
+`scaffolding.commit_to_repo` is `false`, STOP: write nothing in `--apply` mode. The
+repo belongs to a team with its own process; the profile carries what the pipeline
+needs, and `.pipeline-state/` is ignored in `.git/info/exclude` by the harness.
+
 **Idempotent:** skip-if-present-and-correct; never clobber user content without a
 timestamped backup.
 

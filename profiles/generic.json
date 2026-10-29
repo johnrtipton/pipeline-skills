@@ -2,6 +2,7 @@
   "name": "generic",
   "description": "Framework-agnostic defaults for any project",
   "detection": [],
+  "detection_priority": 0,
   "environment": {
     "smoke_test": null,
     "venv_check": true,
@@ -34,6 +35,7 @@
     "placeholder/stub code shipped as production"
   ],
   "stage_additions": {},
+  "stage_replacements": {},
   "docs": {
     "changelog": true,
     "changelog_file": "CHANGELOG.md",
@@ -55,5 +57,10 @@
   "test": {
     "gate_off_required": true,
     "why": "A regression test proves nothing until it has been shown RED without the fix."
+  },
+  "scaffolding": {
+    "commit_to_repo": true,
+    "ignore_file": ".gitignore",
+    "why": "The pipeline's per-checkout files (.pipeline-state/, .pipeline-log.md) are ignored in .gitignore, and pipeline-init may commit its scaffolding. A profile for a repo the user does not own sets commit_to_repo false and ignore_file .git/info/exclude."
   }
 }

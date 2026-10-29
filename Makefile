@@ -1,7 +1,7 @@
-.PHONY: check check-branch check-issues validate-templates terminal-state
+.PHONY: check check-branch check-issues validate-templates validate-profiles terminal-state
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
-check: check-branch validate-templates
+check: check-branch validate-templates validate-profiles
 
 # Guard against reintroduced hard-coded default-branch literals (#18).
 check-branch:
@@ -10,6 +10,11 @@ check-branch:
 # Validate state-file template structure (v0.3.0).
 validate-templates:
 	@bash scripts/validate-templates.sh
+
+# Validate every profile against generic.json's keys (profiles/README.md rule).
+# Usage: make validate-profiles DIRS="profiles ~/.config/pipeline-skills/profiles"
+validate-profiles:
+	@bash scripts/validate-profiles.sh $(DIRS)
 
 # Pre-drain staleness check: verify cited symbols still exist (#7).
 # Usage: make check-issues ISSUES="7 6"

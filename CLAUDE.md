@@ -138,14 +138,16 @@ The three phases never freeze. The KB gets new files when gaps are discovered. T
 
 Profiles customize security checks, checklist items, and conventions per framework. Three layers, each extending the previous:
 
-1. **Built-in profiles** (`profiles/generic.json`, `profiles/django.json`) — Framework-level defaults
+1. **Built-in profiles** (`profiles/generic.json`, `profiles/django.json`) — Framework-level defaults. **Private profiles** in `~/.config/pipeline-skills/profiles/` (or `PIPELINE_PROFILES_DIR`) are searched first: a profile that encodes a company's internal repos or process lives there, never in this public repo
 2. **Project CLAUDE.md** — Repo-level settings (`test_command`, `pipeline_profile`, etc.)
 3. **Per-repo `.pipeline/` overrides** — Repo-specific template patches and extra checklist items
 
 **Profile selection** (in priority order):
 - `--profile django` CLI flag
 - `pipeline_profile: django` in target project's CLAUDE.md
-- Auto-detection: `manage.py` → django, fallback → generic
+- Auto-detection: the `detection` rules of every profile, highest `detection_priority` first (`django` 10: `manage.py`, or `django` in `pyproject.toml`), fallback → generic
+
+A profile edits a template in two ways: `stage_additions` add checklist items, and `stage_replacements` replace a template item (or text in a subagent prompt) that must not run in the project. `scaffolding.ignore_file` set to `.git/info/exclude` keeps `.pipeline-state/` out of a team repo's `.gitignore`. `profiles/README.md` has the schema; `make validate-profiles` checks it.
 
 **Per-repo overrides:**
 - `.pipeline/profile.json` — Extra security patterns, auto-reject triggers, stage checklist items
@@ -164,6 +166,9 @@ python pipeline.py feature --task "Add health check endpoint" --project ~/my-pro
 
 # Start with explicit profile
 python pipeline.py bugfix --task "Fix auth bug" --project ~/my-project --profile django
+
+# Build a ship state file with the profile applied, and stop (what /pipeline-ship runs)
+python pipeline.py ship --task "Fix the flaky spec" --project ~/my-project --init-only --no-merge
 
 # Resume interrupted pipeline
 python pipeline.py --resume --project ~/my-project

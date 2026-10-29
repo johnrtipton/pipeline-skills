@@ -38,6 +38,62 @@ from pathlib import Path
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 PROFILES_DIR = Path(__file__).parent / "profiles"
+# User-level profiles live outside this (public) repo: a profile that encodes a
+# company's internal repos and process must not ship here. They are searched
+# before the built-ins, and one with a built-in's name shadows it.
+DEFAULT_USER_PROFILES_DIR = Path.home() / ".config" / "pipeline-skills" / "profiles"
+
+
+def profile_dirs() -> list[Path]:
+    """Profile directories in search order: ``PIPELINE_PROFILES_DIR`` (or the
+    user-level default), then the built-in ``profiles/``."""
+    user = os.environ.get("PIPELINE_PROFILES_DIR")
+    user_dir = Path(user).expanduser() if user else DEFAULT_USER_PROFILES_DIR
+    return [user_dir, PROFILES_DIR]
+
+
+def find_profile_path(profile_name: str) -> Path | None:
+    """The file of a profile, from the first directory that has it."""
+    for directory in profile_dirs():
+        path = directory / f"{profile_name}.json"
+        if path.exists():
+            return path
+    return None
+
+
+def all_profiles() -> list[tuple[str, dict]]:
+    """Every profile by name, a user-level one shadowing a built-in of the same name."""
+    found: dict[str, dict] = {}
+    for directory in reversed(profile_dirs()):
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.json")):
+            try:
+                found[path.stem] = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"Warning: skipping profile {path}: {exc}")
+    return list(found.items())
+
+
+def matches_detection(project_path: Path, rules: list[dict]) -> bool:
+    """True when any rule matches: ``file`` exists and, if given, holds ``contains``
+    (case-insensitive)."""
+    for rule in rules:
+        name = rule.get("file")
+        if not name:
+            continue
+        path = project_path / name
+        if not path.is_file():
+            continue
+        needle = rule.get("contains")
+        if needle is None:
+            return True
+        try:
+            if needle.lower() in path.read_text(errors="replace").lower():
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def deep_merge(base: dict, overlay: dict) -> dict:
@@ -57,25 +113,29 @@ def deep_merge(base: dict, overlay: dict) -> dict:
 
 
 def detect_profile(project: str) -> str:
-    """Auto-detect the appropriate profile for a project."""
+    """Auto-detect the appropriate profile for a project.
+
+    Order: CLAUDE.md ``pipeline_profile:`` -> the ``detection`` rules of every
+    profile, the highest ``detection_priority`` first (ties by name) -> generic.
+    A project profile outranks a framework one (django), so a repo that names
+    itself in its manifest gets its own profile even when it also uses a framework.
+    """
     project_path = Path(project)
 
-    # Check CLAUDE.md for explicit pipeline_profile setting
+    # Check CLAUDE.md for explicit pipeline_profile setting (hyphens allowed)
     claude_md = project_path / "CLAUDE.md"
     if claude_md.exists():
         content = claude_md.read_text()
-        match = re.search(r"pipeline_profile:\s*(\w+)", content)
+        match = re.search(r"pipeline_profile:\s*([\w.-]+)", content)
         if match:
             return match.group(1)
 
-    # Auto-detect from project files
-    if (project_path / "manage.py").exists():
-        return "django"
-    pyproject = project_path / "pyproject.toml"
-    if pyproject.exists():
-        content = pyproject.read_text().lower()
-        if "django" in content:
-            return "django"
+    candidates = [(name, profile) for name, profile in all_profiles()
+                  if name != "generic" and profile.get("detection")]
+    candidates.sort(key=lambda item: (-int(item[1].get("detection_priority", 0)), item[0]))
+    for name, profile in candidates:
+        if matches_detection(project_path, profile["detection"]):
+            return name
 
     return "generic"
 
@@ -181,12 +241,13 @@ def detect_default_branch(project: str) -> str:
 
 def load_profile(profile_name: str) -> dict:
     """Load a profile, merging with generic base if not already generic."""
-    generic_path = PROFILES_DIR / "generic.json"
-    profile_path = PROFILES_DIR / f"{profile_name}.json"
+    generic_path = find_profile_path("generic") or PROFILES_DIR / "generic.json"
+    profile_path = find_profile_path(profile_name)
 
-    if not profile_path.exists():
+    if profile_path is None:
         print(f"Warning: profile '{profile_name}' not found, using generic")
         profile_path = generic_path
+        profile_name = "generic"
 
     with open(generic_path) as f:
         base = json.load(f)
@@ -227,6 +288,35 @@ def load_project_overrides(project: str, pipeline_type: str) -> tuple[dict | Non
 def apply_profile(state: dict, profile: dict) -> dict:
     """Inject profile content into a state file's stages."""
     pipeline_type = state["pipeline_type"]
+
+    # Replace template checklist items that do not fit the project. stage_additions
+    # can only add, so a template step that must not run here (post the review,
+    # a plain push) needs a replacement. Runs first, so it matches template items only.
+    for key, replacements in profile.get("stage_replacements", {}).items():
+        parts = key.split(".")
+        if len(parts) != 2 or parts[0] != pipeline_type:
+            continue
+        stage = state["stages"].get(parts[1])
+        if stage is None:
+            continue
+        for replacement in replacements:
+            match = replacement.get("match", "")
+            if replacement.get("in") == "subagent_prompt":
+                # The subagent reads its prompt, not the checklist: swap the text there too.
+                prompt = stage.get("subagent_prompt", "")
+                if match and match in prompt:
+                    stage["subagent_prompt"] = prompt.replace(match, replacement["action"], 1)
+                else:
+                    print(f"  Warning: profile replacement {key} matched no prompt text: {match!r}")
+                continue
+            for item in stage.get("checklist", []):
+                if match and match in item.get("action", ""):
+                    item["action"] = replacement["action"]
+                    if "mandatory" in replacement:
+                        item["mandatory"] = replacement["mandatory"]
+                    break
+            else:
+                print(f"  Warning: profile replacement {key} matched no item: {match!r}")
 
     # Inject stage_additions into matching stages' checklists
     for key, additions in profile.get("stage_additions", {}).items():
@@ -274,6 +364,8 @@ def apply_profile(state: dict, profile: dict) -> dict:
         "auto_reject_triggers": profile.get("auto_reject_triggers", []),
         "environment": profile.get("environment", {}),
         "docs": profile.get("docs", {}),
+        "merge": profile.get("merge", {}),
+        "scaffolding": profile.get("scaffolding", {}),
     }
 
     return state
@@ -303,14 +395,36 @@ def load_template(pipeline_type: str, project: str | None = None) -> dict:
         return json.load(f)
 
 
+def current_branch(project: str) -> str | None:
+    """The checked-out branch of the project, or None when detached or not a repo."""
+    try:
+        r = subprocess.run(["git", "-C", project, "rev-parse", "--abbrev-ref", "HEAD"],
+                           capture_output=True, text=True, timeout=10)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    branch = r.stdout.strip()
+    return branch if r.returncode == 0 and branch and branch != "HEAD" else None
+
+
+# Stages that --no-merge skips: the merge, and the retrospective that follows it.
+NO_MERGE_STAGES = ("Merge PR", "Retrospective")
+
+
 def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
                profile_name: str | None = None, agent: str | None = None,
-               agent_model: str | None = None) -> dict:
-    """Create a new state file from template, applying profile and project overrides."""
+               agent_model: str | None = None, branch: str | None = None,
+               no_merge: bool = False) -> dict:
+    """Create a new state file from template, applying profile and project overrides.
+
+    ``branch`` names the branch (a ship run keeps the branch its changes are on);
+    otherwise it is ``<prefix>/<slug of task>``. ``no_merge`` marks the merge and
+    retrospective stages skipped, so the run ends at the code review.
+    """
     project = os.path.abspath(project)
     state = load_template(pipeline_type, project)
-    prefix = {"feature": "feat", "bugfix": "fix", "refactor": "refactor"}[pipeline_type]
-    branch = f"{prefix}/{slugify(task)}"
+    prefix = {"feature": "feat", "bugfix": "fix", "refactor": "refactor",
+              "ship": "ship"}[pipeline_type]
+    branch = branch or f"{prefix}/{slugify(task)}"
 
     state["task_description"] = task
     state["branch_name"] = branch
@@ -336,6 +450,13 @@ def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
     state = apply_profile(state, profile)
     print(f"  Profile: {profile.get('name', profile_name)}")
 
+    if no_merge:
+        state["no_merge"] = True
+        for stage in state["stages"].values():
+            if stage.get("name") in NO_MERGE_STAGES:
+                stage["status"] = "skipped"
+                stage["skip_reason"] = "--no-merge"
+
     return state
 
 
@@ -351,18 +472,47 @@ def save_state(state: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(state, f, indent=2)
-    # Ensure .pipeline-state/ and .pipeline-log.md are gitignored
-    gitignore = Path(state["project_path"]) / ".gitignore"
-    if gitignore.exists():
-        content = gitignore.read_text()
+    # Ensure .pipeline-state/ and .pipeline-log.md are ignored: in .gitignore by
+    # default, or in the clone's own .git/info/exclude when the profile says the
+    # repo is not ours to change (scaffolding.ignore_file).
+    ignore = ignore_file_path(state)
+    if ignore is not None:
+        content = ignore.read_text() if ignore.exists() else ""
         additions = []
         if ".pipeline-state/" not in content:
             additions.append(".pipeline-state/")
         if ".pipeline-log.md" not in content:
             additions.append(".pipeline-log.md")
         if additions:
-            with open(gitignore, "a") as f:
+            with open(ignore, "a") as f:
                 f.write("\n" + "\n".join(additions) + "\n")
+    return path
+
+
+def ignore_file_path(state: dict) -> Path | None:
+    """The file that ignores the pipeline's per-checkout files, or None to skip.
+
+    ``.gitignore`` (the default) is edited only when it exists, as before.
+    ``.git/info/exclude`` resolves through ``git rev-parse --git-path``, so it
+    works in a linked worktree too, and is created when missing.
+    """
+    project = state["project_path"]
+    scaffolding = state.get("profile_config", {}).get("scaffolding", {})
+    name = scaffolding.get("ignore_file") or ".gitignore"
+    if name != ".git/info/exclude":
+        path = Path(project) / name
+        return path if path.exists() else None
+    try:
+        r = subprocess.run(["git", "-C", project, "rev-parse", "--git-path", "info/exclude"],
+                           capture_output=True, text=True, timeout=10)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    path = Path(r.stdout.strip())
+    if not path.is_absolute():
+        path = Path(project) / path
+    path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
@@ -1058,9 +1208,13 @@ Examples:
 
   # Resume
   python pipeline.py --resume --project ~/djust
+
+  # Ship: build the state file of /pipeline-ship (profile applied) and stop
+  python pipeline.py ship --task "Fix the flaky spec" --project . --init-only --no-merge
         """,
     )
-    parser.add_argument("type", nargs="?", choices=["feature", "bugfix", "refactor", "auto"],
+    parser.add_argument("type", nargs="?",
+                        choices=["feature", "bugfix", "refactor", "ship", "auto"],
                         help="Pipeline type or 'auto' for ROADMAP-driven mode")
     parser.add_argument("--task", "-t", help="Task description (for single pipeline)")
     parser.add_argument("--project", "-p", default=".", help="Project directory")
@@ -1080,6 +1234,14 @@ Examples:
     parser.add_argument("--roadmap", help="Path to ROADMAP.md (auto-detected if not specified)")
     # Profile options
     parser.add_argument("--profile", help="Pipeline profile (generic/django/... or auto-detect)")
+    # Single-pipeline options
+    parser.add_argument("--branch",
+                        help="Branch name (ship default: the current branch, if not the target)")
+    parser.add_argument("--no-merge", action="store_true",
+                        help="Skip the Merge PR and Retrospective stages (stop after code review)")
+    parser.add_argument("--init-only", action="store_true",
+                        help="Write the state file, print its path and exit without running "
+                             "stages (what /pipeline-ship uses to apply the profile)")
     # Agent backend options
     parser.add_argument("--agent", "-a", choices=AGENT_BACKENDS,
                         help="Agent backend to drive the pipeline "
@@ -1142,12 +1304,20 @@ Examples:
     if not args.type or not args.task:
         parser.error("Pipeline type and --task are required (or use 'auto' or --resume)")
 
-    if args.type not in ("feature", "bugfix", "refactor"):
+    if args.type not in ("feature", "bugfix", "refactor", "ship"):
         parser.error(f"Unknown pipeline type: {args.type}")
+
+    branch = args.branch
+    if not branch and args.type == "ship":
+        # Ship keeps the branch its changes are on, unless that is the target.
+        on = current_branch(args.project)
+        if on and on != args.target_branch:
+            branch = on
 
     state = init_state(args.type, args.task, args.project, args.target_branch,
                        profile_name=args.profile, agent=args.agent,
-                       agent_model=args.agent_model)
+                       agent_model=args.agent_model, branch=branch,
+                       no_merge=args.no_merge)
 
     # Check if state file already exists (duplicate)
     existing = state_path(state["project_path"], state["branch_name"])
@@ -1155,6 +1325,11 @@ Examples:
         print(f"State file already exists: {existing}")
         print("Use --resume to continue, or delete it to start fresh.")
         sys.exit(1)
+
+    if args.init_only:
+        path = save_state(state)
+        print(f"State file: {path}")
+        return
 
     print(f"Starting {args.type} pipeline")
     print(f"Task: {args.task}")
