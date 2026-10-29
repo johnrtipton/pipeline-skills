@@ -99,6 +99,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   retroactively at each milestone's retro commit (#48).
 
 ### Fixed
+- Profile security patterns and auto-reject triggers no longer fall off. `load_profile`
+  concatenated `generic` first and `apply_profile` kept the first 10, so a project
+  profile with 10 patterns lost 5 of them from the Security Check item. The most
+  specific source now comes first (`.pipeline/profile.json`, the profile, `generic`),
+  each entry once, with no cap. The triggers now also reach the `check auto-reject
+  triggers` items: the `{profile_triggers}` placeholder they were written to is in no
+  template. `scripts/check-profile-patterns.sh` (`make check-profile-patterns`, part of
+  `make check`) proves it end to end through `pipeline.py ship --init-only`.
+- `/pipeline-ship` Step 2.6 predicted conflicts with `git merge-tree <base> HEAD
+  origin/$BASE | grep -c '^<<<<<<<'`, whose grep misses the markers: the three-argument
+  form prints them inside a diff, as `+<<<<<<< .our`. It reported 0 on a branch whose
+  merge then conflicted. Step 2.6 now uses `git merge-tree --write-tree --name-only HEAD
+  origin/$BASE` (exit 1 = conflicts, with the files; git >= 2.38) with a trial-merge
+  fallback in a throwaway worktree, and the ship template's Commit & PR stage runs the
+  same check before the push (its `git diff --check` sees only markers in the tree).
 - `pipeline-drain` / `pipeline-retro`: `gh issue create` has no `--json`/`-q`
   flag — it prints the new issue's URL, so `-q .number` silently yielded empty.
   Both skills now parse the number off the URL tail. The `\n`-in-`--body` trap

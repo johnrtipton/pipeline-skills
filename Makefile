@@ -1,7 +1,7 @@
-.PHONY: check check-branch check-issues validate-templates validate-profiles terminal-state
+.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns terminal-state
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
-check: check-branch validate-templates validate-profiles
+check: check-branch validate-templates validate-profiles check-profile-patterns
 
 # Guard against reintroduced hard-coded default-branch literals (#18).
 check-branch:
@@ -15,6 +15,11 @@ validate-templates:
 # Usage: make validate-profiles DIRS="profiles ~/.config/pipeline-skills/profiles"
 validate-profiles:
 	@bash scripts/validate-profiles.sh $(DIRS)
+
+# A profile's own security patterns / auto-reject triggers all reach the state
+# file, ahead of generic's (end to end through pipeline.py ship --init-only).
+check-profile-patterns:
+	@bash scripts/check-profile-patterns.sh
 
 # Pre-drain staleness check: verify cited symbols still exist (#7).
 # Usage: make check-issues ISSUES="7 6"

@@ -8,6 +8,6 @@ page exists. (ADR-0004.)
 
 | gate / rule | pattern | origin | in SKILL.md |
 |---|---|---|---|
-| Stage 1 three-dot diff, `merge-tree` when in doubt | `stale-base-review` | — | “three-dot” |
+| Stage 1 three-dot diff; predict conflicts with `merge-tree --write-tree` (Step 2.6, Stage 6), never the three-argument form | `stale-base-review` | the three-argument form reported 0 on a branch whose merge conflicted | “three-dot”, “--write-tree” |
 | Pre-merge gate: Code Review artifact + state | `retro-dropout` | — | “Pre-merge gate” |
 | End-of-run retrospective gate | `retro-dropout` | — | “Retrospective (Stage 10)” |
