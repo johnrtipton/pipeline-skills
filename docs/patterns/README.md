@@ -27,3 +27,6 @@ row here is a gate with no living pattern behind it.
 | `unverified-claim` | Open the file and cite the path (and line) before writing any claim about what the code or docs contain. | skill · none (proposed: upstream #83) | djust #2838 |
 | `fix-reproduces-own-bug` | Enumerate every caller's invariant of the shared state a fix touches before the first edit. | skill · none (proposed: upstream #82) | djust #2147 |
 | `ineffective-rule` | A rule that keeps being re-violated is a rejected proposal; harden it into a gate or demote it. | skill · `pipeline-retro` Stage 3.7 | ADR-0004 |
+| `adjacent-evidence` | Before citing a file as evidence, confirm it describes the same app, environment, instance and version as the claim. | skill · `pipeline-review` Stage 4 | — |
+| `stale-pr-state` | Re-fetch a PR's head and merge state right before posting to it or reporting on it. | skill · `pipeline-review` Stage 8, rule | — |
+| `unresolved-thread-block` | Where the base branch requires resolved review threads, put non-blocking review comments in the review body, not in inline threads. | skill · `pipeline-review` Stage 6 | — |
