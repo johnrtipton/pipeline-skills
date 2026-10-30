@@ -2,7 +2,7 @@
 
 A development pipeline harness for Claude Code. Runs multi-stage pipelines (feature, bugfix, refactor, strategy) with enforced quality gates, PR reviews, and retrospectives. Ships as both:
 
-- **10 interactive skills** (`/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-strategy`, `/pipeline-cycle`, etc.) for use from a Claude Code chat — this is the primary interface
+- **11 interactive skills** (`/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-ship`, `/pipeline-review`, `/pipeline-strategy`, `/pipeline-cycle`, etc.) for use from a Claude Code chat — this is the primary interface
 - **`pipeline.py` harness** for autonomous / headless runs against a project
 
 ## The Problem
@@ -31,6 +31,7 @@ Each skill is a single `SKILL.md` invoked by typing `/<skill-name>` in Claude Co
 | [`/pipeline-next`](skills/pipeline-next/SKILL.md) | Parses `ROADMAP.md`, filters by milestone/priority, picks the next task, creates `.pipeline-state/<branch>.json` from the template. Can `--group` related small features into batches | Start of every feature from a roadmap |
 | [`/pipeline-run`](skills/pipeline-run/SKILL.md) | Stage executor. Reads the state file, spawns agents for each pending stage, updates state after each. Can process a single task, all tasks in a milestone (`--all`), or all milestones | After `/pipeline-next`, or to resume an interrupted run |
 | [`/pipeline-ship`](skills/pipeline-ship/SKILL.md) | Takes existing uncommitted/committed changes in your working tree and runs them through test → review → security → docs → commit → PR → code review → merge → retro | When you've been coding interactively and want to formalize and ship |
+| [`/pipeline-review`](skills/pipeline-review/SKILL.md) | Reviews someone else's pull request from its URL: checks the description's claims at their source, finds who consumes the change, compares it with accepted decision records and open neighbour PRs, reads CI and the branch rules, then drafts an approve / request-changes / comment review and posts it only after you approve | When someone asks you to review their PR |
 | [`/pipeline-dev`](skills/pipeline-dev/SKILL.md) | Fast-iteration loop for early development: branch → implement → push → verify → merge. No subagent review, no CHANGELOG, no roadmap coupling | Early exploration, where **you** are the reviewer (manual browser/CLI verification) |
 | [`/pipeline-retro`](skills/pipeline-retro/SKILL.md) | Milestone retrospectives + Action Tracker reconciliation. Synthesizes per-PR retros into `RETRO.md`, creates GitHub issues for deferred findings. `--reconcile` scans all tracking locations for drift | End of every milestone |
 | [`/pipeline-roadmap-audit`](skills/pipeline-roadmap-audit/SKILL.md) | Verifies every "not started" ROADMAP entry against the actual codebase. Catches stale entries where a feature shipped but the ROADMAP still claims it's pending | Before cutting a release candidate; after large consolidations |
@@ -272,6 +273,7 @@ pipeline-skill/
 │   ├── feature-state.json              # Feature pipeline template (15 stages)
 │   ├── bugfix-state.json               # Bug fix pipeline template (12 stages)
 │   ├── refactor-state.json             # Refactor pipeline template (12 stages)
+│   ├── review-state.json               # PR review template (9 stages)
 │   ├── ship-state.json                 # Ship pipeline template (10 stages)
 │   └── strategy-state.json             # Strategy session template (8 stages)
 └── skills/
@@ -279,6 +281,7 @@ pipeline-skill/
     ├── pipeline-next/SKILL.md          # Task picker from ROADMAP.md
     ├── pipeline-run/SKILL.md           # Stage executor
     ├── pipeline-ship/SKILL.md          # Ship existing working tree changes
+    ├── pipeline-review/SKILL.md        # Review someone else's PR, post after approval
     ├── pipeline-dev/SKILL.md           # Fast-iteration loop (no subagent review)
     ├── pipeline-retro/SKILL.md         # Milestone retros + action tracker
     ├── pipeline-roadmap-audit/SKILL.md # Catch stale ROADMAP entries

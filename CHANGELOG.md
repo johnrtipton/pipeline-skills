@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `/pipeline-review`: reviews someone else's pull request from its URL, in its own workspace
+  (`~/.pipeline-reviews/<owner>__<repo>__<n>/`) and driven by `templates/review-state.json`
+  (9 stages). It checks the description's claims at their source, the change's consumers,
+  accepted decision records, open neighbour PRs, CI and the branch rules, then drafts an approve,
+  request-changes or comment review and posts it only after the user approves. Three pattern
+  rows come with it: `adjacent-evidence`, `stale-pr-state` and `unresolved-thread-block`.
+  `skills/pipeline-review/scripts/review_state.py` is the only writer of a review's state file,
+  and refuses to close a stage while a mandatory item is open.
 - Private profiles: `pipeline.py` searches `~/.config/pipeline-skills/profiles/`
   (or `PIPELINE_PROFILES_DIR`) before `profiles/`, so a profile that encodes a
   company's internal repos and process never ships in this public repo.
