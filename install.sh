@@ -1,22 +1,40 @@
 #!/bin/bash
 # Install pipeline skills into Claude Code
 # Usage: ./install.sh [--symlink]
+#
+# --symlink links each skill folder to this clone, so a `git pull` updates them.
+# Without it, each skill folder is copied whole (scripts included), plus the repo
+# files the skill reads at run time (runtime_files below), so the copy works
+# without the clone.
 
 SKILL_DIR="${HOME}/.claude/skills"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Repo files a skill reads at run time, relative to the clone. A symlinked skill
+# reaches them through the clone; a copied one gets them inside its own folder.
+runtime_files() {
+    case "$1" in
+        pipeline-review) echo "templates/review-state.json" ;;
+    esac
+}
+
+mkdir -p "$SKILL_DIR"
 for skill in "${SCRIPT_DIR}/skills/pipeline-"*; do
     name=$(basename "$skill")
     target="${SKILL_DIR}/${name}"
 
+    # Replace whatever is there: copying into an earlier symlink would write into the clone.
+    rm -rf "$target"
     if [ "$1" = "--symlink" ]; then
-        rm -rf "$target"
         ln -sf "$skill" "$target"
         echo "Symlinked $name → $target"
     else
-        mkdir -p "$target"
-        cp "$skill/SKILL.md" "$target/SKILL.md"
-        [ -f "$skill/PURPOSE.md" ] && cp "$skill/PURPOSE.md" "$target/PURPOSE.md"
+        cp -R "$skill" "$target"
+        rm -rf "$target/scripts/__pycache__"
+        for f in $(runtime_files "$name"); do
+            mkdir -p "$target/$(dirname "$f")"
+            cp "${SCRIPT_DIR}/$f" "$target/$f"
+        done
         echo "Copied $name → $target"
     fi
 done

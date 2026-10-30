@@ -47,13 +47,16 @@ an item asks, read this skill again instead of guessing.
 A review is about a remote PR, not your working tree, so it gets its own workspace:
 
 ```bash
-PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-review)")")}"
+SKILL_HOME="$(readlink -f "${PIPELINE_SKILL_DIR:-$HOME/.claude}/skills/pipeline-review")"
 WS="${PIPELINE_REVIEW_DIR:-$HOME/.pipeline-reviews}/<owner>__<repo>__<n>"
-RS="$PIPELINE_DIR/skills/pipeline-review/scripts/review_state.py"
+RS="$SKILL_HOME/scripts/review_state.py"
 mkdir -p "$WS/notes"
-python3 "$RS" init "$WS/state.json" --template "$PIPELINE_DIR/templates/review-state.json" \
-  --pr-url <url> --repo <owner/repo> --number <n> [--no-post]
+python3 "$RS" init "$WS/state.json" --pr-url <url> --repo <owner/repo> --number <n> [--no-post]
 ```
+
+`SKILL_HOME` is the clone's `skills/pipeline-review` for a symlink install (or with
+`PIPELINE_SKILL_DIR` set to a clone), and the copied folder for a copy install. `init` finds
+`review-state.json` itself: in the copied folder's `templates/`, or else in the clone's.
 
 - If `$WS/state.json` exists and `--resume` was not given, `init` refuses. Tell the user that a
   review of this PR exists and ask whether to resume it or start again.
@@ -73,8 +76,14 @@ python3 "$RS" tick   "$WS/state.json" <stage> <index> ...    # mark items done (
 python3 "$RS" set    "$WS/state.json" head_sha_reviewed=<sha> base_branch=<base>
 python3 "$RS" add    "$WS/state.json" claims '{"claim": "...", "status": "VERIFIED", "evidence": "path:line"}'
 python3 "$RS" add    "$WS/state.json" findings '{"severity": "Must", "title": "...", "evidence": "..."}'
+python3 "$RS" list   "$WS/state.json" claims             # entries with their 0-based indexes
+python3 "$RS" update "$WS/state.json" claims <index> '{"status": "REFUTED", "evidence": "path:line"}'
 python3 "$RS" done   "$WS/state.json" <stage> <VERDICT>  # refused while a mandatory item is open
 ```
+
+When a claim or finding you recorded turns out wrong, correct it with `update`: it merges the
+object's fields into the entry at that index and leaves its other fields as they were. `add` prints
+the new entry's index, and `list` shows them all. Never edit `state.json` by hand to fix one.
 
 Repeat until every stage is `completed` or `skipped`. Run `status` before each stage; it re-reads
 the file and lists what is open, which keeps the checklist in front of you after a long stage. Tick
