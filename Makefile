@@ -21,7 +21,8 @@ validate-profiles:
 check-profile-patterns:
 	@bash scripts/check-profile-patterns.sh
 
-# review_state.py list/update correct a recorded claim or finding, and refuse bad input.
+# review_state.py list/update correct a recorded claim or finding, round starts a re-review
+# after a finished one, and all three refuse bad input.
 check-review-state:
 	@bash scripts/check-review-state.sh
 

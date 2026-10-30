@@ -15,9 +15,19 @@ Every command names the state file, so two reviews never share one by accident.
     review_state.py list   <state.json> claims|findings               # entries with their indexes
     review_state.py update <state.json> claims|findings <index> '<json object>'
                                                               # merge fields into one entry
+    review_state.py round  <state.json> [--no-post] [--template <review-state.json>]
+                                                              # re-review: archive the finished
+                                                              # round, start the next one
 
-Without --template, init uses review-state.json from the skill folder's templates/ (a copy
-install puts it there) or else the clone's templates/ (a symlink install, or a clone).
+Without --template, init and round use review-state.json from the skill folder's templates/ (a
+copy install puts it there) or else the clone's templates/ (a symlink install, or a clone).
+
+init ticks the checklist items marked re_review: a first review has no earlier round. round
+refuses while a stage of the current round is open. It moves the finished state to
+rounds/<n>.json beside it and starts round n+1 from the template, with its re_review items open
+and previous_head, previous_review_url and previous_verdict from the finished round. The
+finished round's findings that are not RESOLVED or WITHDRAWN come along with recheck PENDING,
+and a stage marked recheck_findings (Verify Claims) cannot close while one is still PENDING.
 """
 
 import datetime
@@ -32,8 +42,11 @@ def _now() -> str:
 
 
 def _load(path: str) -> dict:
-    with open(path) as fh:
-        return json.load(fh)
+    try:
+        with open(path) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        sys.exit(f"no state file at {path}; init starts a review")
 
 
 def _save(path: str, state: dict) -> None:
@@ -96,17 +109,27 @@ def _usage(args: list[str], count: int, usage: str) -> None:
         sys.exit(f"usage: review_state.py {usage}")
 
 
-def cmd_init(args: list[str]) -> None:
-    path, opts = args[0], {}
-    rest = args[1:]
+def _options(rest: list[str], allowed: tuple[str, ...]) -> dict:
+    opts = {}
     while rest:
         flag = rest.pop(0)
         if flag == "--no-post":
             opts["no_post"] = True
-        elif flag in ("--template", "--pr-url", "--repo", "--number") and rest:
+        elif flag in allowed and rest:
             opts[flag[2:].replace("-", "_")] = rest.pop(0)
         else:
             sys.exit(f"unknown or incomplete option {flag!r}")
+    return opts
+
+
+def _pending_rechecks(state: dict) -> list[int]:
+    return [i for i, item in enumerate(state.get("findings", []))
+            if isinstance(item, dict) and item.get("recheck") == "PENDING"]
+
+
+def cmd_init(args: list[str]) -> None:
+    path = args[0]
+    opts = _options(args[1:], ("--template", "--pr-url", "--repo", "--number"))
     missing = [k for k in ("pr_url", "repo", "number") if k not in opts]
     if missing:
         sys.exit(f"init needs --{', --'.join(m.replace('_', '-') for m in missing)}")
@@ -122,6 +145,11 @@ def cmd_init(args: list[str]) -> None:
         task_description=f"Review {opts['repo']}#{opts['number']}",
         started_at=_now(),
     )
+    # A first review has no earlier round, so the re-review items have nothing to do.
+    for stage in state["stages"].values():
+        for item in stage["checklist"]:
+            if item.get("re_review"):
+                item["done"] = True
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     _save(path, state)
     print(f"created {path}")
@@ -130,9 +158,16 @@ def cmd_init(args: list[str]) -> None:
 def cmd_status(args: list[str]) -> None:
     state = _load(args[0])
     key = _next_stage(state)
-    print(f"PR {state.get('repo')}#{state.get('pr_number')}  head reviewed: {state.get('head_sha_reviewed') or '-'}")
+    print(f"PR {state.get('repo')}#{state.get('pr_number')}  round {state.get('round', 1)}"
+          f"  head reviewed: {state.get('head_sha_reviewed') or '-'}")
+    if state.get("previous_head"):
+        print(f"previous round: head {state['previous_head']}, {state.get('previous_verdict') or 'no verdict'},"
+              f" review {state.get('previous_review_url') or 'not posted'}")
+    pending = _pending_rechecks(state)
+    if pending:
+        print(f"findings to recheck against the new commits: {pending}")
     if key is None:
-        print("every stage is done")
+        print("every stage is done; if the PR's head moved since, round starts a re-review")
         return
     stage = state["stages"][key]
     print(f"next: stage {key}, {stage['name']} ({stage['status']})")
@@ -171,6 +206,10 @@ def cmd_done(args: list[str]) -> None:
     open_items = [i for i, item in enumerate(stage["checklist"]) if item.get("mandatory") and not item.get("done")]
     if open_items:
         sys.exit(f"stage {key} ({stage['name']}) still has mandatory items open: {open_items}")
+    pending = _pending_rechecks(state) if stage.get("recheck_findings") else []
+    if pending:
+        sys.exit(f"stage {key} ({stage['name']}) cannot close while findings {pending} from the last round"
+                 f" are still recheck PENDING; record RESOLVED, OPEN or WITHDRAWN with update")
     stage.update(status="completed", verdict=verdict)
     nxt = _next_stage(state)
     state["current_stage"] = nxt
@@ -229,10 +268,66 @@ def cmd_update(args: list[str]) -> None:
     print(f"updated {kind}[{index}]: {json.dumps(entries[index], ensure_ascii=False)}")
 
 
+def cmd_round(args: list[str]) -> None:
+    path = args[0]
+    opts = _options(args[1:], ("--template",))
+    state = _load(path)
+    still_open = [f"{k} ({st['name']}, {st['status']})" for k, st in state["stages"].items()
+                  if st["status"] not in ("completed", "skipped")]
+    if still_open:
+        sys.exit(f"stages still open in this round: {', '.join(still_open)}; finish or skip them"
+                 f" (status {path}) before starting a round")
+    if not state.get("head_sha_reviewed"):
+        sys.exit("this round recorded no head_sha_reviewed, so the next one has nothing to diff against;"
+                 " set it to the head this round reviewed first")
+    number = state.get("round", 1)
+    folder = os.path.dirname(os.path.abspath(path))
+    archive = os.path.join(folder, "rounds", f"{number}.json")
+    # A file there that is not this round means something else wrote it: never overwrite a past round.
+    # The same round is a rerun after a crash between the two writes below, so carry on.
+    if os.path.exists(archive) and _load(archive) != state:
+        sys.exit(f"{archive} exists and is not this round; move it aside before starting a round")
+
+    carried = []
+    for item in state.get("findings", []):
+        if not isinstance(item, dict) or item.get("recheck") in ("RESOLVED", "WITHDRAWN"):
+            continue
+        item = {k: v for k, v in item.items() if k != "recheck_evidence"}
+        item.setdefault("round", number)
+        item["recheck"] = "PENDING"
+        carried.append(item)
+
+    fresh = _load(opts.get("template") or _default_template())
+    fresh.update({k: state.get(k) for k in ("pr_url", "repo", "pr_number", "base_branch")})
+    fresh.update(
+        workspace=folder,
+        post_mode="none" if opts.get("no_post") else "ask",
+        task_description=f"Re-review {state.get('repo')}#{state.get('pr_number')}, round {number + 1}",
+        started_at=_now(),
+        round=number + 1,
+        previous_head=state["head_sha_reviewed"],
+        previous_review_url=state.get("posted_review_url"),
+        previous_verdict=state.get("review_verdict"),
+        rounds=state.get("rounds", []) + [{
+            "round": number,
+            "state": os.path.relpath(archive, folder),
+            "head": state["head_sha_reviewed"],
+            "verdict": state.get("review_verdict"),
+            "review_url": state.get("posted_review_url"),
+        }],
+        findings=carried,
+    )
+    os.makedirs(os.path.dirname(archive), exist_ok=True)
+    _save(archive, state)
+    _save(path, fresh)
+    print(f"round {number} archived to {archive}; round {number + 1} started in {path}"
+          f" with {len(carried)} findings to recheck: {list(range(len(carried)))}")
+
+
 COMMANDS = {
     "init": cmd_init, "status": cmd_status, "set": cmd_set, "tick": cmd_tick,
     "done": cmd_done, "skip": cmd_skip, "add": cmd_add, "list": cmd_list,
-    "update": cmd_update,
+    "update": cmd_update, "round": cmd_round,
 }
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ the author can act on. The user decides whether and how it is posted.
 ```
 /pipeline-review <pr>                # review, draft, ask, then post
 /pipeline-review <pr> --no-post      # stop at the draft; the user posts it
-/pipeline-review <pr> --resume       # continue an interrupted review from its state file
+/pipeline-review <pr> --resume       # continue an interrupted review, or re-review new commits
 /pipeline-review <pr> --focus "<text>"   # weight one concern, e.g. "the migration"
 ```
 
@@ -32,7 +32,7 @@ the author can act on. The user decides whether and how it is posted.
 |---|---|
 | `<pr>` | A PR URL (`https://github.com/<owner>/<repo>/pull/<n>`, any suffix such as `/changes` or `/files`), `<owner>/<repo>#<n>`, or `<n>` for the repo of the current checkout |
 | `--no-post` | Stage 8 posts nothing. `draft.md` is the deliverable |
-| `--resume` | Read the existing state file and continue at its `current_stage` |
+| `--resume` | Read the existing state file and continue at its `current_stage`. After a finished review whose PR has new commits, start a re-review round ([Resume](#resume-and-re-review-rounds)) |
 | `--focus` | A concern to weight in stages 4 and 5. It narrows nothing else |
 
 ## How it works
@@ -58,11 +58,14 @@ python3 "$RS" init "$WS/state.json" --pr-url <url> --repo <owner/repo> --number 
 `PIPELINE_SKILL_DIR` set to a clone), and the copied folder for a copy install. `init` finds
 `review-state.json` itself: in the copied folder's `templates/`, or else in the clone's.
 
-- If `$WS/state.json` exists and `--resume` was not given, `init` refuses. Tell the user that a
-  review of this PR exists and ask whether to resume it or start again.
+- If `$WS/state.json` exists, `init` refuses. Run `status`. With a stage still open and no
+  `--resume`, tell the user that a review of this PR exists and ask whether to resume it or start
+  again. With every stage done and new commits on the PR, the author has answered the review:
+  start a re-review round ([Resume](#resume-and-re-review-rounds)).
 - The workspace holds `state.json`, the clone in `repo/`, evidence in `notes/`, the review body in
-  `draft.md`, and any helper file you write. Keep every file of the review inside `$WS`, never in
-  a shared scratch folder: two reviews running at once must not write into each other's files.
+  `draft.md`, finished rounds in `rounds/<n>.json`, and any helper file you write. Keep every file
+  of the review inside `$WS`, never in a shared scratch folder: two reviews running at once must
+  not write into each other's files.
 
 `pipeline.py` has no `review` type yet, so `review_state.py` builds the state file from the template.
 
@@ -79,6 +82,7 @@ python3 "$RS" add    "$WS/state.json" findings '{"severity": "Must", "title": ".
 python3 "$RS" list   "$WS/state.json" claims             # entries with their 0-based indexes
 python3 "$RS" update "$WS/state.json" claims <index> '{"status": "REFUTED", "evidence": "path:line"}'
 python3 "$RS" done   "$WS/state.json" <stage> <VERDICT>  # refused while a mandatory item is open
+python3 "$RS" round  "$WS/state.json" [--no-post]        # re-review: archive the finished round, start the next
 ```
 
 When a claim or finding you recorded turns out wrong, correct it with `update`: it merges the
@@ -107,7 +111,9 @@ each item as you finish it, then close the stage with `done`. Stage verdicts:
 description in full: what it claims, what it says it ran and what it says it did not. Read the
 existing reviews and threads too. A point someone already raised needs a "+1" at most, and a reply
 to an earlier review may answer a finding before you write it. A merged or closed PR changes the job
-from gatekeeping to follow-up, so tell the user before going further.
+from gatekeeping to follow-up, so tell the user before going further. In a re-review round, read
+the author's answers to the previous review first: which findings they say they fixed, and which
+they dispute.
 
 **2. Checkout.** Work in `$WS/repo`, never in a checkout or worktree the user is using: they may
 have uncommitted work there, and a review must not move their branch. Review the three-dot diff
@@ -116,6 +122,12 @@ phantom deletions under two-dot (`stale-base-review`). Predict conflicts with
 `git merge-tree --write-tree`, as `/pipeline-ship` Step 2.6 describes. Note the result (behind by
 how many commits, clean or conflicting): the review states it, because the author and the person
 who merges both need it.
+
+In a re-review round, fetch with `+pull/<n>/head:pr-<n>`: an author who rebased or force-pushed
+rewrote the branch, and a plain fetch refuses to move `pr-<n>`. Save the new commits' diff,
+`git diff <previous_head> pr-<n>`, to `notes/round-<round>.patch`. When `previous_head` is no longer
+an ancestor of the head (`git merge-base --is-ancestor`), compare the two versions of the branch
+with `git range-diff origin/<base>..<previous_head> origin/<base>..pr-<n>` instead.
 
 **3. Understand.** Read the whole diff and the changed files in context. Write the plain summary
 before judging anything, because a review that cannot say what the PR does in two sentences is not
@@ -138,7 +150,18 @@ describe a sibling app. A file at `main` does not describe the version the PR pi
 (`adjacent-evidence`). When a claim cannot be checked, because access is missing or a command is
 blocked, say so in the review instead of filling the gap from memory.
 
-**5. Consequences.** Find who consumes what changed: every process that loads the same settings
+In a re-review round, start with the findings carried from the last round (`recheck: PENDING`).
+Check each one against the new commits and the file at the new head, as you would a claim: an
+author's "fixed" is a claim like any other. Record the result with `update`: `RESOLVED` when the
+new code fixes it, `OPEN` when it does not or does so only in part, `WITHDRAWN` when the author
+showed the finding wrong and the source agrees. Add `recheck_evidence` (path:line at the new head,
+or the commit). `done 4` is refused while one is still `PENDING`.
+
+**5. Consequences.** Re-fetch the base first (`git fetch origin <base>`). A neighbour PR can merge
+after the author's last push and move the lines that the PR, its claims and the findings cite, or
+make the PR conflict. Between review rounds, that window is days long. If the base moved since
+stage 2, redo the behind check and `merge-tree`, and re-read the cited base lines.
+Then find who consumes what changed: every process that loads the same settings
 (a new required setting breaks any job that loads the full settings without it), other services and
 repos, generated clients, and the order things deploy in. Compare the PR with the accepted decision
 records and docs on the base branch, and with itself: its code, tests, docs and description should
@@ -167,8 +190,13 @@ Rank the findings Must, Should and Nit. Each one says what is wrong, the evidenc
 concrete fix. Also list what you checked and what held. An author trusts a review that shows its
 work, and the next reviewer need not redo it. That list always includes the merge status from
 stages 2 and 5: whether the branch is current with its base, whether it merges cleanly, and which
-open PRs it conflicts with. A finding that lives only in the state file does not reach the author. Write `draft.md` in the posted voice, addressed to the
-author. Then explain it to the user in plain language and ask whether to post it, and as which kind.
+open PRs it conflicts with. A finding that lives only in the state file does not reach the author.
+Write `draft.md` in the posted voice, addressed to the author. Then explain it to the user in plain
+language and ask whether to post it, and as which kind.
+
+In a re-review round, open the draft with the earlier findings and what became of each (resolved,
+still open, withdrawn) at the new head, then the new findings. An earlier Must that is still open
+keeps the verdict at REQUEST_CHANGES.
 
 **8. Post.** Only on the user's explicit OK for this review. An OK given for another PR earlier in
 the conversation does not carry over. Then:
@@ -204,19 +232,52 @@ as updating a PR of theirs after this one merges.
   action.
 - **Keep the review's files in its workspace.** Clones, notes, drafts and helper scripts all go in
   `$WS`. A shared scratch folder lets a second review overwrite them.
+- **One state file per workspace.** A later round of the same PR goes through `round`, never
+  through a second state file elsewhere in `$WS`: `round` keeps the history where the script, and
+  the next round, can read it.
 - **Keep secrets out of the review.** Never paste tokens, keys or credential values into a review,
   even when the PR handles them. Name the secret, never its value.
 
-## Resume
+## Resume and re-review rounds
 
 `--resume` reads `$WS/state.json` and continues at `current_stage`. When the PR's head moved since
 `head_sha_reviewed`, say so first: the review covers the old head, and stages 2 to 7 must look at
 the new commits before anything is posted.
 
+When every stage is done and the head moved after the review, the author has answered it. Start a
+re-review round, whether the user said `--resume` or gave the PR again:
+
+```bash
+python3 "$RS" status "$WS/state.json"                            # every stage done? the head it reviewed
+gh pr view <n> --repo <owner/repo> --json headRefOid,state,mergedAt  # the head now
+python3 "$RS" round "$WS/state.json" [--no-post]
+```
+
+`round` refuses while a stage of the current round is open: finish or skip it first. It moves the
+finished state to `$WS/rounds/<n>.json` and starts the next round in `$WS/state.json` from the
+template, so the stage loop runs as before. The new round has:
+
+- `previous_head`, `previous_review_url` and `previous_verdict` from the finished round, and
+  `rounds`, every earlier round with its head, verdict, review URL and archive file.
+- The finished round's findings that are not `RESOLVED` or `WITHDRAWN`, each with
+  `recheck: PENDING` and `round`, the round that raised it. Claims do not carry over: stage 3 lists
+  the claims of the new head, and the old ones stay in the archive.
+- The checklist items marked `re_review` open. `init` ticks them in a first review, which has no
+  earlier round.
+
+The round reviews the whole PR at its new head, since an approval covers all of it, starting from
+the new commits: stage 1 reads the author's answers, stage 2 saves the new commits' diff, stage 4
+checks each earlier finding against them before the new claims, stage 5 re-fetches the base, and
+the stage 7 draft opens with what became of the earlier findings.
+
+A round is for new commits. If the head has not moved but the author disputes a finding in a
+thread, check the dispute at its source and correct the review if it was wrong (see the rules
+above). Start a round without new commits only if the user asks for a second review.
+
 ## Cleanup
 
-The workspace stays after the review, for `--resume` and as the record of what was checked. Remove
-`$WS` when the PR is merged and nothing is left to follow up.
+The workspace stays after the review, for `--resume`, for a later round and as the record of what
+was checked. Remove `$WS` when the PR is merged and nothing is left to follow up.
 
 ## Examples
 
@@ -224,7 +285,7 @@ The workspace stays after the review, for `--resume` and as the record of what w
 /pipeline-review https://github.com/acme/api/pull/412
 /pipeline-review acme/infra#88 --focus "the database migration"
 /pipeline-review 57 --no-post          # in a checkout of the PR's repo; draft only
-/pipeline-review acme/api#412 --resume
+/pipeline-review acme/api#412 --resume   # interrupted: continue; finished and new commits: a new round
 ```
 
 ## What this is not
