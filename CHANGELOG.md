@@ -125,6 +125,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   symlink, and both create `~/.claude/skills` when it is missing (symlink mode failed on a
   fresh home). `scripts/check-install.sh` (`make check-install`, part of `make check`)
   installs into a throwaway home in each mode and starts a review from the result.
+- `install.sh` copy mode gives the other skills a `pipeline.py`. `/pipeline-ship`,
+  `/pipeline-init`, `/pipeline-next`, `/pipeline-run`, `/pipeline-strategy` and
+  `pipeline-shared` find the clone through the folder their skill links to, which in copy
+  mode is `~/.claude`: no `pipeline.py`, `templates/` or `profiles/`, so ship state lost its
+  profile and the template fallbacks failed without saying so. Copy mode now copies
+  `pipeline.py`, `templates/` and `profiles/` to `~/.claude/skills/.pipeline-skill`, and each
+  skill's `PIPELINE_DIR` line falls back to it when the linked folder has no `pipeline.py`.
+  Symlink installs still resolve to the clone (and remove a stale copy). `/pipeline-init`
+  now resolves the same way instead of searching `~` for any `pipeline.py`, which could
+  pick another checkout. `scripts/check-install.sh` runs every skill's `PIPELINE_DIR`
+  lines in each mode and `pipeline.py ship --init-only` from the copy.
 - Profile security patterns and auto-reject triggers no longer fall off. `load_profile`
   concatenated `generic` first and `apply_profile` kept the first 10, so a project
   profile with 10 patterns lost 5 of them from the Security Check item. The most

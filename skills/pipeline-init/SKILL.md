@@ -53,8 +53,8 @@ logic and generic fallbacks — never a literal like `make test`, `master`, or
 right thing on a `main`+`npm` repo or a `development`+`go` repo with no edits.
 
 **Templates are COPIED, not reproduced.** The canonical `<type>-state.json`
-templates live in the pipeline-skill's `templates/` directory (resolved via
-`PIPELINE_SKILL_DIR` or the directory containing `pipeline.py`). They are NOT all
+templates live in the pipeline-skill's `templates/` directory (`$PIPELINE_DIR`,
+resolved in Step 3: the linked clone, or the copy install). They are NOT all
 the same shape: **feature = 14 stages**, **bugfix = 12 stages**
 (Diagnosis/Fix/Regression Check, `-diagnosis.md`, no Change Detection, no
 standalone Security Check), **refactor = 12 stages** (Analysis/Refactor
@@ -296,7 +296,7 @@ DETECTION RECORD
   ROADMAP        : <path or ABSENT> — format: PIPELINE | FOREIGN | ABSENT
   version_scheme : none → seed <base-version>   (or: <existing>)
   changelog      : <existing | keep-a-changelog | release-please | cargo-release | none>
-  pipeline-skill : <PIPELINE_SKILL_DIR or dir-containing-pipeline.py, for template source>
+  pipeline-skill : <$PIPELINE_DIR from Step 3, for template source>
   scaffolding    : .pipeline-state/[Y/N] .pipeline-templates/[which] gitignore[Y/N]
                    CHANGELOG[Y/N] RETRO[Y/N + tracker?] pr/feedback[Y/N]
                    docs/adr[Y/N] docs/strategy-sessions[Y/N] CLAUDE.md-config[Y/N]
@@ -352,9 +352,11 @@ feature, `-diagnosis.md` for bugfix, the Re-Review / address-findings loop folde
 into Review Verdict, etc.).
 
 ```bash
-# Resolve the canonical template source.
-SKILL_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(command -v pipeline.py 2>/dev/null || find ~ -maxdepth 6 -name pipeline.py -path '*pipeline-skill*' 2>/dev/null | head -1)")}"
-SRC="$SKILL_DIR/templates"
+# Resolve the canonical template source: the clone this skill links to (or
+# PIPELINE_SKILL_DIR), else the copy that `./install.sh` without --symlink installs.
+PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-init)")")}"
+[ -f "$PIPELINE_DIR/pipeline.py" ] || PIPELINE_DIR="$HOME/.claude/skills/.pipeline-skill"   # copy install
+SRC="$PIPELINE_DIR/templates"
 test -f "$SRC/feature-state.json" || { echo "ERROR: canonical templates not found under $SRC — set PIPELINE_SKILL_DIR"; exit 1; }
 mkdir -p .pipeline-templates
 ```
@@ -440,14 +442,15 @@ PY
 
 Also write `.pipeline-templates/README.md` documenting precedence:
 project-local templates OVERRIDE the **skill-default** templates in the
-pipeline-skill's `templates/` directory (resolved via `PIPELINE_SKILL_DIR` or the
-directory containing `pipeline.py` — NOT `~/.claude/skills/...`); `pipeline-next`
+pipeline-skill's `templates/` directory (`$PIPELINE_DIR/templates`: the clone the
+skills link to, or `~/.claude/skills/.pipeline-skill` for a copy install); `pipeline-next`
 checks project-local first. Note that `.pipeline-templates/` is committed (so the
 team shares it) while `.pipeline-state/` contents and `.pipeline-log.md` are
 gitignored (per-checkout).
 
-> If the canonical templates cannot be located (no `PIPELINE_SKILL_DIR`, no
-> `pipeline.py` on disk), STOP and tell the user to set `PIPELINE_SKILL_DIR` —
+> If the canonical templates cannot be located (no `pipeline.py` in
+> `$PIPELINE_DIR`), STOP and tell the user to re-run `./install.sh` from their
+> clone or set `PIPELINE_SKILL_DIR` to it —
 > do NOT fall back to hand-written skeletons, which would get the bugfix/refactor
 > shape wrong.
 
@@ -887,7 +890,7 @@ rejects). Greps are a cheap pre-check only.
    ```
 3. **ROADMAP conformance — run the actual parser (the real end-to-end gate):**
    ```bash
-   python "$SKILL_DIR/pipeline.py" auto --project . --list   # or: import parse_roadmap
+   python "$PIPELINE_DIR/pipeline.py" auto --project . --list   # or: import parse_roadmap
    ```
    Assert it returns ≥1 task with the expected name/priority/type. On the stock
    repo this must surface migrated item 8 — name "restore rust ↔ python parity",

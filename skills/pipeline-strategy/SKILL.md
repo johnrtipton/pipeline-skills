@@ -79,10 +79,17 @@ where `<slug>` is provided via `--slug` or derived from the trigger
 context (e.g., `v3-p0-end`, `post-retro-check`).
 
 If `--resume` and a strategy state file exists, load it and jump to
-the first pending stage. Otherwise, copy `templates/strategy-state.json`
+the first pending stage. Otherwise, copy `$PIPELINE_DIR/templates/strategy-state.json`
 to `.pipeline-state/strategy-<date>-<slug>.json` and fill in
 `task_description`, `branch_name` (use the slug; no actual branch is
 created), `project_path`, `started_at`, `trigger`, and `mode`.
+`$PIPELINE_DIR` is the clone this skill links to (or `PIPELINE_SKILL_DIR`),
+else the copy install:
+
+```bash
+PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-strategy)")")}"
+[ -f "$PIPELINE_DIR/pipeline.py" ] || PIPELINE_DIR="$HOME/.claude/skills/.pipeline-skill"   # copy install
+```
 
 ### 2. Execute stages 1 → 8 in order
 

@@ -25,7 +25,8 @@ check-profile-patterns:
 check-review-state:
 	@bash scripts/check-review-state.sh
 
-# install.sh copy and symlink modes both give /pipeline-review its script and template.
+# install.sh copy and symlink modes both give /pipeline-review its script and template,
+# and every skill that sets PIPELINE_DIR a pipeline.py with its templates and profiles.
 check-install:
 	@bash scripts/check-install.sh
 
