@@ -1,7 +1,7 @@
-.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns terminal-state
+.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns check-review-state check-install terminal-state
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
-check: check-branch validate-templates validate-profiles check-profile-patterns
+check: check-branch validate-templates validate-profiles check-profile-patterns check-review-state check-install
 
 # Guard against reintroduced hard-coded default-branch literals (#18).
 check-branch:
@@ -20,6 +20,14 @@ validate-profiles:
 # file, ahead of generic's (end to end through pipeline.py ship --init-only).
 check-profile-patterns:
 	@bash scripts/check-profile-patterns.sh
+
+# review_state.py list/update correct a recorded claim or finding, and refuse bad input.
+check-review-state:
+	@bash scripts/check-review-state.sh
+
+# install.sh copy and symlink modes both give /pipeline-review its script and template.
+check-install:
+	@bash scripts/check-install.sh
 
 # Pre-drain staleness check: verify cited symbols still exist (#7).
 # Usage: make check-issues ISSUES="7 6"

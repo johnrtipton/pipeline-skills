@@ -14,6 +14,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   rows come with it: `adjacent-evidence`, `stale-pr-state` and `unresolved-thread-block`.
   `skills/pipeline-review/scripts/review_state.py` is the only writer of a review's state file,
   and refuses to close a stage while a mandatory item is open.
+- `review_state.py update <state> claims|findings <index> '<json object>'` merges the
+  object's fields into one recorded entry, so a reviewer corrects a claim or finding
+  through the script instead of editing the state file by hand. `list <state>
+  claims|findings` prints the entries with their 0-based indexes, and `add` now prints
+  the index it gave. Both refuse an unknown list name, an index out of range or not a
+  number, and JSON that is not an object. `scripts/check-review-state.sh`
+  (`make check-review-state`, part of `make check`) covers them.
 - Private profiles: `pipeline.py` searches `~/.config/pipeline-skills/profiles/`
   (or `PIPELINE_PROFILES_DIR`) before `profiles/`, so a profile that encodes a
   company's internal repos and process never ships in this public repo.
@@ -107,6 +114,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   retroactively at each milestone's retro commit (#48).
 
 ### Fixed
+- `install.sh` copy mode installs a working `/pipeline-review`. It copied only `SKILL.md`
+  and `PURPOSE.md`, so the copy had no `scripts/review_state.py`, and the path line in its
+  `SKILL.md` resolved to `~/.claude`, where no template lives. Copy mode now copies each
+  skill folder whole, plus `templates/review-state.json` into the review skill's folder;
+  `SKILL.md` resolves `SKILL_HOME` to the skill folder in both modes (or to
+  `$PIPELINE_SKILL_DIR/skills/pipeline-review` when that is set), and `review_state.py init`
+  finds `review-state.json` itself when `--template` is not given. Both modes now replace
+  what is at the target, so copy mode no longer writes into the clone through an earlier
+  symlink, and both create `~/.claude/skills` when it is missing (symlink mode failed on a
+  fresh home). `scripts/check-install.sh` (`make check-install`, part of `make check`)
+  installs into a throwaway home in each mode and starts a review from the result.
 - Profile security patterns and auto-reject triggers no longer fall off. `load_profile`
   concatenated `generic` first and `apply_profile` kept the first 10, so a project
   profile with 10 patterns lost 5 of them from the Security Check item. The most
