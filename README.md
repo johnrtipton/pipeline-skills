@@ -82,8 +82,10 @@ DRIVE THE WHOLE LOOP (instead of the above by hand):
 git clone git@github.com:johnrtipton/pipeline-skills.git ~/pipeline-skill
 cd ~/pipeline-skill
 
-# Install skills into Claude Code
+# Install skills into Claude Code (links to this clone; `git pull` updates them)
 ./install.sh --symlink
+# or copy them, with pipeline.py, templates/ and profiles/, to stand alone:
+# ./install.sh
 
 # In Claude Code, from within your target project:
 /pipeline-init                     # one-time: scaffold state, templates, config (run once per repo)

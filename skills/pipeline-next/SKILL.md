@@ -96,11 +96,13 @@ Read the template file — **check project-local templates first**:
 #    .pipeline-templates/bugfix-state.json
 #    .pipeline-templates/refactor-state.json
 #
-# 2. Fall back to the pipeline-skill's templates/ directory:
-#    Locate via: the directory containing pipeline.py, or PIPELINE_SKILL_DIR env var.
-#    templates/feature-state.json
-#    templates/bugfix-state.json
-#    templates/refactor-state.json
+# 2. Fall back to the pipeline-skill's templates/ directory — in the clone this
+#    skill links to (or PIPELINE_SKILL_DIR), else in the copy install:
+PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-next)")")}"
+[ -f "$PIPELINE_DIR/pipeline.py" ] || PIPELINE_DIR="$HOME/.claude/skills/.pipeline-skill"   # copy install
+#    $PIPELINE_DIR/templates/feature-state.json
+#    $PIPELINE_DIR/templates/bugfix-state.json
+#    $PIPELINE_DIR/templates/refactor-state.json
 #
 # Project-local templates override skill defaults when they exist.
 # Projects customize them to add stages (e.g., Re-Review), subagent prompts,

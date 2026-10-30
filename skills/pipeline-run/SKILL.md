@@ -34,7 +34,11 @@ If no incomplete state file exists (no `.pipeline-state/*.json` with `completed_
 **State file templates** — check for project-local templates first, then fall back to the pipeline skill's templates:
 
 1. **Project-local** (preferred): `.pipeline-templates/feature-state.json` (or `bugfix-state.json`, `refactor-state.json`) in the project root. Projects customize these to add stages, subagent prompts, and project-specific checklists.
-2. **Skill default** (fallback): `templates/` directory in the pipeline skill's directory (locate via `PIPELINE_SKILL_DIR` env var or the directory containing `pipeline.py`).
+2. **Skill default** (fallback): `$PIPELINE_DIR/templates/` — the clone this skill links to (or `PIPELINE_SKILL_DIR`), else the copy install:
+   ```bash
+   PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-run)")")}"
+   [ -f "$PIPELINE_DIR/pipeline.py" ] || PIPELINE_DIR="$HOME/.claude/skills/.pipeline-skill"   # copy install
+   ```
 
 If a project-local template exists, **always use it** — it overrides the default.
 

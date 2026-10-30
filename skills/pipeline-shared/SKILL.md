@@ -20,7 +20,12 @@ These procedures are referenced by name from the pipeline-feature, pipeline-bugf
 **This is the very first action in any pipeline — before Environment Check, before anything else.**
 
 1. `mkdir -p .pipeline-state`
-2. Copy the appropriate template from the pipeline-skill repo's `templates/` directory:
+2. Copy the appropriate template from the pipeline-skill repo's `templates/` directory,
+   `$PIPELINE_DIR/templates/` (the linked clone or `PIPELINE_SKILL_DIR`, else the copy install):
+   ```bash
+   PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-shared)")")}"
+   [ -f "$PIPELINE_DIR/pipeline.py" ] || PIPELINE_DIR="$HOME/.claude/skills/.pipeline-skill"   # copy install
+   ```
    - Feature: `templates/feature-state.json`
    - Bugfix: `templates/bugfix-state.json`
    - Refactor: `templates/refactor-state.json`
@@ -65,7 +70,7 @@ Pipelines write progress to `.pipeline-state/<branch-name>.json` in the project 
 
 ### Initializing State
 
-At pipeline start, copy the appropriate template from the pipeline-skill repo's `templates/` directory:
+At pipeline start, copy the appropriate template from the pipeline-skill repo's `templates/` directory (`$PIPELINE_DIR/templates/`, resolved as in Step 0):
 - `templates/feature-state.json` for feature pipelines
 - `templates/bugfix-state.json` for bugfix pipelines
 - `templates/refactor-state.json` for refactor pipelines

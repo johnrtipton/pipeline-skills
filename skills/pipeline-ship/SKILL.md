@@ -109,6 +109,7 @@ Use this when you've been coding interactively and want to formalize, review, an
    (detection, `stage_additions`, `stage_replacements`, security patterns, `scaffolding`):
    ```bash
    PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-ship)")")}"
+   [ -f "$PIPELINE_DIR/pipeline.py" ] || PIPELINE_DIR="$HOME/.claude/skills/.pipeline-skill"   # copy install
    python3 "$PIPELINE_DIR/pipeline.py" ship --init-only --project . \
        --task "<description>" --branch "<branch>" --target-branch "<target>" \
        [--no-merge] [--profile <name>]
