@@ -14,6 +14,11 @@
   "review_verdict": null,
   "user_approval": null,
   "posted_review_url": null,
+  "round": 1,
+  "previous_head": "",
+  "previous_review_url": null,
+  "previous_verdict": null,
+  "rounds": [],
   "claims": [],
   "findings": [],
   "stages": {
@@ -38,6 +43,12 @@
           "mandatory": true
         },
         {
+          "action": "re-review round: read the author's answers to the previous review (previous_review_url), the threads and the commits since previous_head; note which earlier findings they say they fixed and which they dispute",
+          "done": false,
+          "mandatory": true,
+          "re_review": true
+        },
+        {
           "action": "list the companion PRs, issues and decision records the description names, each with its current state",
           "done": false
         },
@@ -59,7 +70,7 @@
           "mandatory": true
         },
         {
-          "action": "git fetch origin pull/<n>/head:pr-<n> and git fetch origin <base>",
+          "action": "git fetch origin +pull/<n>/head:pr-<n> and git fetch origin <base> (the + lets a later round fetch a head the author force-pushed)",
           "done": false,
           "mandatory": true
         },
@@ -72,6 +83,12 @@
           "action": "git diff origin/<base>...pr-<n> --stat, and the full THREE-DOT diff saved to <workspace>/notes/diff.patch; never two-dot",
           "done": false,
           "mandatory": true
+        },
+        {
+          "action": "re-review round: save the new commits' diff, git diff <previous_head> pr-<n>, to <workspace>/notes/round-<round>.patch; if previous_head is not an ancestor of pr-<n> (git merge-base --is-ancestor: a rebase or force-push), compare with git range-diff origin/<base>..<previous_head> origin/<base>..pr-<n> instead",
+          "done": false,
+          "mandatory": true,
+          "re_review": true
         },
         {
           "action": "predict conflicts: git merge-tree --write-tree --name-only --no-messages pr-<n> origin/<base> (exit 0 clean, 1 conflicts)",
@@ -110,7 +127,14 @@
       "name": "Verify Claims",
       "status": "pending",
       "verdict": null,
+      "recheck_findings": true,
       "checklist": [
+        {
+          "action": "re-review round: check each finding carried from the last round (recheck PENDING) against the new commits and the file at the new head; record recheck RESOLVED, OPEN or WITHDRAWN (the author showed it wrong, and the source agrees) with recheck_evidence, through update. done refuses this stage while one is still PENDING",
+          "done": false,
+          "mandatory": true,
+          "re_review": true
+        },
         {
           "action": "check each claim at its source: the file and line at the PR head, the upstream code at the exact pinned version, the other repo's default branch, or a read-only API call; record the evidence (path:line, URL or command) in state.claims",
           "done": false,
@@ -137,6 +161,11 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {
+          "action": "re-fetch the base before this stage (git fetch origin <base>); if it moved since stage 2, redo the behind check and merge-tree, and re-read every base line the PR, its claims or the findings cite: a neighbour PR can merge after the author's last push and move those lines",
+          "done": false,
+          "mandatory": true
+        },
         {
           "action": "consumers: find everything that reads what changed (other processes that load the same settings, jobs, services, other repos, generated clients) and whether each still works after the change, in the order it deploys",
           "done": false,
@@ -193,6 +222,12 @@
       "status": "pending",
       "verdict": null,
       "checklist": [
+        {
+          "action": "re-review round: open the draft with the earlier findings and what became of each (resolved, still open, withdrawn) at the new head, then the new findings; an earlier Must still OPEN keeps the verdict at REQUEST_CHANGES",
+          "done": false,
+          "mandatory": true,
+          "re_review": true
+        },
         {
           "action": "pick the verdict: REQUEST_CHANGES only for a must-fix (wrong behaviour, security, a deploy break, a contradiction with an accepted decision); APPROVE when only suggestions and nits remain; COMMENT when the review cannot conclude",
           "done": false,
@@ -266,7 +301,7 @@
           "done": false
         },
         {
-          "action": "set completed_at and review_verdict, keep the workspace for --resume, and say where it is",
+          "action": "set completed_at and review_verdict, keep the workspace for --resume and for a later round (review_state.py round), and say where it is",
           "done": false,
           "mandatory": true
         }

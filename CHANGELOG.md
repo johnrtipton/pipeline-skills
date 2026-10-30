@@ -21,6 +21,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   the index it gave. Both refuse an unknown list name, an index out of range or not a
   number, and JSON that is not an object. `scripts/check-review-state.sh`
   (`make check-review-state`, part of `make check`) covers them.
+- Re-review rounds for `/pipeline-review`. After the author answers a finished review,
+  `review_state.py round <state> [--no-post]` moves the finished state to
+  `rounds/<n>.json` in the workspace and starts the next round in the same `state.json`
+  from the template. It carries `previous_head`, `previous_review_url`,
+  `previous_verdict`, a `rounds` history, and the findings not yet `RESOLVED` or
+  `WITHDRAWN`, each marked `recheck: PENDING` with the round that raised it. It refuses
+  while a stage of the current round is open, when the round recorded no reviewed head,
+  and over an archive that is not the round being closed. The template's new `re_review`
+  checklist items (read the author's answers, save the new commits' diff, recheck each
+  earlier finding, open the draft with what became of them) are ticked by `init` and
+  open in a round, and `done` refuses Verify Claims while a carried finding is still
+  `PENDING`. Every review's Consequences stage now re-fetches the base first: a neighbour
+  PR can merge after the author's last push and move the lines the PR cites. Stage 2
+  fetches the PR head with `+`, so a force-pushed head updates `pr-<n>`. SKILL.md's
+  Resume section and stages 1, 2, 4, 5 and 7 describe the round, and
+  `scripts/check-review-state.sh` covers it and each refusal.
 - Private profiles: `pipeline.py` searches `~/.config/pipeline-skills/profiles/`
   (or `PIPELINE_PROFILES_DIR`) before `profiles/`, so a profile that encodes a
   company's internal repos and process never ships in this public repo.
