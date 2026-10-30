@@ -47,13 +47,16 @@ an item asks, read this skill again instead of guessing.
 A review is about a remote PR, not your working tree, so it gets its own workspace:
 
 ```bash
-PIPELINE_DIR="${PIPELINE_SKILL_DIR:-$(dirname "$(dirname "$(readlink -f ~/.claude/skills/pipeline-review)")")}"
+SKILL_HOME="$(readlink -f "${PIPELINE_SKILL_DIR:-$HOME/.claude}/skills/pipeline-review")"
 WS="${PIPELINE_REVIEW_DIR:-$HOME/.pipeline-reviews}/<owner>__<repo>__<n>"
-RS="$PIPELINE_DIR/skills/pipeline-review/scripts/review_state.py"
+RS="$SKILL_HOME/scripts/review_state.py"
 mkdir -p "$WS/notes"
-python3 "$RS" init "$WS/state.json" --template "$PIPELINE_DIR/templates/review-state.json" \
-  --pr-url <url> --repo <owner/repo> --number <n> [--no-post]
+python3 "$RS" init "$WS/state.json" --pr-url <url> --repo <owner/repo> --number <n> [--no-post]
 ```
+
+`SKILL_HOME` is the clone's `skills/pipeline-review` for a symlink install (or with
+`PIPELINE_SKILL_DIR` set to a clone), and the copied folder for a copy install. `init` finds
+`review-state.json` itself: in the copied folder's `templates/`, or else in the clone's.
 
 - If `$WS/state.json` exists and `--resume` was not given, `init` refuses. Tell the user that a
   review of this PR exists and ask whether to resume it or start again.

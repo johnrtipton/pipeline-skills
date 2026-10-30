@@ -3,8 +3,8 @@
 
 Every command names the state file, so two reviews never share one by accident.
 
-    review_state.py init   <state.json> --template <review-state.json> --pr-url <url>
-                           --repo <owner/repo> --number <n> [--no-post]
+    review_state.py init   <state.json> --pr-url <url> --repo <owner/repo> --number <n>
+                           [--no-post] [--template <review-state.json>]
     review_state.py status <state.json>                  # the next stage and its open items
     review_state.py set    <state.json> key=value ...    # top-level fields; values may be JSON
     review_state.py tick   <state.json> <stage> <index> ...   # mark checklist items done (0-based)
@@ -12,6 +12,9 @@ Every command names the state file, so two reviews never share one by accident.
                                                               # mandatory item is open
     review_state.py skip   <state.json> <stage> <reason>      # mark a stage skipped
     review_state.py add    <state.json> claims|findings '<json object>'
+
+Without --template, init uses review-state.json from the skill folder's templates/ (a copy
+install puts it there) or else the clone's templates/ (a symlink install, or a clone).
 """
 
 import datetime
@@ -60,6 +63,18 @@ def _stage(state: dict, key: str) -> dict:
     return state["stages"][key]
 
 
+def _default_template() -> str:
+    skill = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    candidates = [
+        os.path.join(skill, "templates", "review-state.json"),
+        os.path.join(os.path.dirname(os.path.dirname(skill)), "templates", "review-state.json"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    sys.exit(f"no review-state.json in {' or '.join(candidates)}; pass --template <path>")
+
+
 def cmd_init(args: list[str]) -> None:
     path, opts = args[0], {}
     rest = args[1:]
@@ -71,12 +86,12 @@ def cmd_init(args: list[str]) -> None:
             opts[flag[2:].replace("-", "_")] = rest.pop(0)
         else:
             sys.exit(f"unknown or incomplete option {flag!r}")
-    missing = [k for k in ("template", "pr_url", "repo", "number") if k not in opts]
+    missing = [k for k in ("pr_url", "repo", "number") if k not in opts]
     if missing:
         sys.exit(f"init needs --{', --'.join(m.replace('_', '-') for m in missing)}")
     if os.path.exists(path):
         sys.exit(f"{path} exists; use status to resume it, or remove it to start again")
-    state = _load(opts["template"])
+    state = _load(opts.get("template") or _default_template())
     state.update(
         pr_url=opts["pr_url"],
         repo=opts["repo"],
