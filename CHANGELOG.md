@@ -113,6 +113,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - `docs/releasing.md` — release process; cut the first four tags (`v0.1.0`–`v0.4.0`)
   retroactively at each milestone's retro commit (#48).
 
+### Changed
+- `--no-merge` skips only the Merge PR stage. The Retrospective now runs after the
+  Review Verdict and posts its PR comment, so a draft or team-merged PR keeps the
+  record of its run, and the `/pipeline-ship` Retrospective gate can pass.
+  `scripts/check-no-merge.sh` (`make check-no-merge`, part of `make check`) asserts it.
+- The retro step no longer tells the agent to add `.pipeline-log.md` to `.gitignore`.
+  The harness already ignores it where `scaffolding.ignore_file` says, and a team
+  repo keeps it in `.git/info/exclude`.
+
 ### Fixed
 - `install.sh` copy mode installs a working `/pipeline-review`. It copied only `SKILL.md`
   and `PURPOSE.md`, so the copy had no `scripts/review_state.py`, and the path line in its

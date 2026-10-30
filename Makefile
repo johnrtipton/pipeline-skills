@@ -1,7 +1,7 @@
-.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns check-review-state check-install terminal-state
+.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns check-review-state check-install check-no-merge terminal-state
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
-check: check-branch validate-templates validate-profiles check-profile-patterns check-review-state check-install
+check: check-branch validate-templates validate-profiles check-profile-patterns check-review-state check-install check-no-merge
 
 # Guard against reintroduced hard-coded default-branch literals (#18).
 check-branch:
@@ -29,6 +29,10 @@ check-review-state:
 # and every skill that sets PIPELINE_DIR a pipeline.py with its templates and profiles.
 check-install:
 	@bash scripts/check-install.sh
+
+# --no-merge skips the merge only; the Retrospective still runs and posts.
+check-no-merge:
+	@bash scripts/check-no-merge.sh
 
 # Pre-drain staleness check: verify cited symbols still exist (#7).
 # Usage: make check-issues ISSUES="7 6"
