@@ -76,8 +76,14 @@ python3 "$RS" tick   "$WS/state.json" <stage> <index> ...    # mark items done (
 python3 "$RS" set    "$WS/state.json" head_sha_reviewed=<sha> base_branch=<base>
 python3 "$RS" add    "$WS/state.json" claims '{"claim": "...", "status": "VERIFIED", "evidence": "path:line"}'
 python3 "$RS" add    "$WS/state.json" findings '{"severity": "Must", "title": "...", "evidence": "..."}'
+python3 "$RS" list   "$WS/state.json" claims             # entries with their 0-based indexes
+python3 "$RS" update "$WS/state.json" claims <index> '{"status": "REFUTED", "evidence": "path:line"}'
 python3 "$RS" done   "$WS/state.json" <stage> <VERDICT>  # refused while a mandatory item is open
 ```
+
+When a claim or finding you recorded turns out wrong, correct it with `update`: it merges the
+object's fields into the entry at that index and leaves its other fields as they were. `add` prints
+the new entry's index, and `list` shows them all. Never edit `state.json` by hand to fix one.
 
 Repeat until every stage is `completed` or `skipped`. Run `status` before each stage; it re-reads
 the file and lists what is open, which keeps the checklist in front of you after a long stage. Tick

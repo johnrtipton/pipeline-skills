@@ -11,7 +11,10 @@ Every command names the state file, so two reviews never share one by accident.
     review_state.py done   <state.json> <stage> <VERDICT>     # close a stage; refused while a
                                                               # mandatory item is open
     review_state.py skip   <state.json> <stage> <reason>      # mark a stage skipped
-    review_state.py add    <state.json> claims|findings '<json object>'
+    review_state.py add    <state.json> claims|findings '<json object>'   # prints its index
+    review_state.py list   <state.json> claims|findings               # entries with their indexes
+    review_state.py update <state.json> claims|findings <index> '<json object>'
+                                                              # merge fields into one entry
 
 Without --template, init uses review-state.json from the skill folder's templates/ (a copy
 install puts it there) or else the clone's templates/ (a symlink install, or a clone).
@@ -73,6 +76,24 @@ def _default_template() -> str:
         if os.path.isfile(path):
             return path
     sys.exit(f"no review-state.json in {' or '.join(candidates)}; pass --template <path>")
+
+
+def _kind(kind: str, command: str) -> str:
+    if kind not in ("claims", "findings"):
+        sys.exit(f"{command} takes claims or findings, not {kind!r}")
+    return kind
+
+
+def _object(text: str) -> dict:
+    item = _value(text)
+    if not isinstance(item, dict):
+        sys.exit(f"the item must be a JSON object, not {text!r}")
+    return item
+
+
+def _usage(args: list[str], count: int, usage: str) -> None:
+    if len(args) != count:
+        sys.exit(f"usage: review_state.py {usage}")
 
 
 def cmd_init(args: list[str]) -> None:
@@ -169,20 +190,49 @@ def cmd_skip(args: list[str]) -> None:
 
 
 def cmd_add(args: list[str]) -> None:
-    path, kind, text = args[0], args[1], args[2]
-    if kind not in ("claims", "findings"):
-        sys.exit("add takes claims or findings")
-    item = _value(text)
-    if not isinstance(item, dict):
-        sys.exit("the item must be a JSON object")
+    _usage(args, 3, "add <state.json> claims|findings '<json object>'")
+    path, kind, text = args[0], _kind(args[1], "add"), args[2]
+    item = _object(text)
     state = _load(path)
-    state.setdefault(kind, []).append(item)
+    entries = state.setdefault(kind, [])
+    entries.append(item)
     _save(path, state)
+    print(f"added {kind}[{len(entries) - 1}]")
+
+
+def cmd_list(args: list[str]) -> None:
+    _usage(args, 2, "list <state.json> claims|findings")
+    path, kind = args[0], _kind(args[1], "list")
+    entries = _load(path).get(kind, [])
+    print(f"{kind}: {len(entries)}")
+    for i, item in enumerate(entries):
+        print(f"  [{i}] {json.dumps(item, ensure_ascii=False)}")
+
+
+def cmd_update(args: list[str]) -> None:
+    _usage(args, 4, "update <state.json> claims|findings <index> '<json object>'")
+    path, kind, text = args[0], _kind(args[1], "update"), args[3]
+    fields = _object(text)
+    state = _load(path)
+    entries = state.get(kind, [])
+    try:
+        index = int(args[2])
+    except ValueError:
+        sys.exit(f"the index must be a whole number, not {args[2]!r}")
+    if not 0 <= index < len(entries):
+        span = f"0 to {len(entries) - 1}" if entries else "none: the list is empty"
+        sys.exit(f"no {kind}[{index}]; indexes are {span} (see: list {path} {kind})")
+    if not isinstance(entries[index], dict):
+        sys.exit(f"{kind}[{index}] is not a JSON object, so it cannot be merged into")
+    entries[index].update(fields)
+    _save(path, state)
+    print(f"updated {kind}[{index}]: {json.dumps(entries[index], ensure_ascii=False)}")
 
 
 COMMANDS = {
     "init": cmd_init, "status": cmd_status, "set": cmd_set, "tick": cmd_tick,
-    "done": cmd_done, "skip": cmd_skip, "add": cmd_add,
+    "done": cmd_done, "skip": cmd_skip, "add": cmd_add, "list": cmd_list,
+    "update": cmd_update,
 }
 
 if __name__ == "__main__":

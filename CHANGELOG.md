@@ -14,6 +14,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   rows come with it: `adjacent-evidence`, `stale-pr-state` and `unresolved-thread-block`.
   `skills/pipeline-review/scripts/review_state.py` is the only writer of a review's state file,
   and refuses to close a stage while a mandatory item is open.
+- `review_state.py update <state> claims|findings <index> '<json object>'` merges the
+  object's fields into one recorded entry, so a reviewer corrects a claim or finding
+  through the script instead of editing the state file by hand. `list <state>
+  claims|findings` prints the entries with their 0-based indexes, and `add` now prints
+  the index it gave. Both refuse an unknown list name, an index out of range or not a
+  number, and JSON that is not an object. `scripts/check-review-state.sh`
+  (`make check-review-state`, part of `make check`) covers them.
 - Private profiles: `pipeline.py` searches `~/.config/pipeline-skills/profiles/`
   (or `PIPELINE_PROFILES_DIR`) before `profiles/`, so a profile that encodes a
   company's internal repos and process never ships in this public repo.
