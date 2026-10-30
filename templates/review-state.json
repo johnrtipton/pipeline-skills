@@ -1,0 +1,276 @@
+{
+  "pipeline_type": "review",
+  "task_description": "",
+  "pr_url": "",
+  "repo": "",
+  "pr_number": null,
+  "base_branch": "",
+  "head_sha_reviewed": "",
+  "workspace": "",
+  "post_mode": "ask",
+  "started_at": null,
+  "completed_at": null,
+  "current_stage": "1",
+  "review_verdict": null,
+  "user_approval": null,
+  "posted_review_url": null,
+  "claims": [],
+  "findings": [],
+  "stages": {
+    "1": {
+      "name": "Intake",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "gh pr view <n> --repo <owner/repo> --json title,author,state,isDraft,baseRefName,headRefName,headRefOid,mergedAt,mergeable,body,files,reviews,comments,statusCheckRollup — record head_sha_reviewed, base_branch and the PR state in the state file",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "read the PR description in full; note what it says was run, what was not run, and what it calls unverified",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "read the existing reviews, review threads and comments (gh api repos/<owner>/<repo>/pulls/<n>/comments and .../issues/<n>/comments): points already raised and replies to earlier reviews, so the review neither repeats nor ignores them",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "list the companion PRs, issues and decision records the description names, each with its current state",
+          "done": false
+        },
+        {
+          "action": "if the PR is merged, closed or a draft, tell the user now and ask whether to continue: a review of a merged PR is follow-up work, not a merge gate",
+          "done": false,
+          "mandatory": true
+        }
+      ]
+    },
+    "2": {
+      "name": "Checkout",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "clone or fetch the repo into <workspace>/repo, never into a checkout or worktree the user works in",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "git fetch origin pull/<n>/head:pr-<n> and git fetch origin <base>",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "behind check: git rev-list --count pr-<n>..origin/<base>; if non-zero, say the branch is behind and review against its merge-base",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "git diff origin/<base>...pr-<n> --stat, and the full THREE-DOT diff saved to <workspace>/notes/diff.patch; never two-dot",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "predict conflicts: git merge-tree --write-tree --name-only --no-messages pr-<n> origin/<base> (exit 0 clean, 1 conflicts)",
+          "done": false,
+          "mandatory": true
+        }
+      ]
+    },
+    "3": {
+      "name": "Understand",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "read the whole diff, and open every changed source file at the PR head for context, not only the hunks",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "classify the change: code, config or infrastructure, schema or migration, docs, tests, generated or recorded fixtures; note which part is mechanical",
+          "done": false
+        },
+        {
+          "action": "write two to four plain sentences: what the PR does and why",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "list every claim the change relies on, from the description, code comments, docs and commit messages (versions, the behaviour of other systems, 'X already sets Y', 'nothing else reads Z', test results), into state.claims",
+          "done": false,
+          "mandatory": true
+        }
+      ]
+    },
+    "4": {
+      "name": "Verify Claims",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "check each claim at its source: the file and line at the PR head, the upstream code at the exact pinned version, the other repo's default branch, or a read-only API call; record the evidence (path:line, URL or command) in state.claims",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "before citing a file as evidence, confirm it describes the same thing as the claim: the same app, environment, instance and version",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "mark each claim VERIFIED, REFUTED or UNVERIFIED; a refuted claim that the change depends on is a finding",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "for a claim that cannot be checked (no access, a blocked command), record why; never fill the gap from memory",
+          "done": false
+        }
+      ]
+    },
+    "5": {
+      "name": "Consequences",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "consumers: find everything that reads what changed (other processes that load the same settings, jobs, services, other repos, generated clients) and whether each still works after the change, in the order it deploys",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "decisions: compare the change with the accepted decision records and docs on the base branch, and the PR with itself (code against its own docs, tests and description); a contradiction is a finding",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "neighbours: find the other open PRs that touch the same files, and test-merge each with this one",
+          "done": false
+        },
+        {
+          "action": "security: authentication, authorization, secrets, data exposure, injection, sensitive values in logs (pipeline-shared, Code Review)",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "tests: the tests exercise the changed code; note what the description says was not run",
+          "done": false
+        }
+      ]
+    },
+    "6": {
+      "name": "Repo Rules and CI",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "CI on the reviewed head: which checks passed, failed, were skipped or are pending",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "branch rules: gh api repos/<owner>/<repo>/rules/branches/<base> (and the branch protection, if readable): required approvals, code-owner review, last-push approval, required review thread resolution, merge queue",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "if review threads must be resolved before merging, put non-blocking comments in the review body, not in inline threads",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "code owners: whether the user's approval counts (CODEOWNERS and their team membership), so they know whether it unblocks the merge",
+          "done": false
+        }
+      ]
+    },
+    "7": {
+      "name": "Draft",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "pick the verdict: REQUEST_CHANGES only for a must-fix (wrong behaviour, security, a deploy break, a contradiction with an accepted decision); APPROVE when only suggestions and nits remain; COMMENT when the review cannot conclude",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "rank the findings Must, Should and Nit; each says what is wrong, its evidence, its impact and a concrete fix",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "list what was checked and held, and what was not verified and why; the list states the merge status: current with the base or behind it, merges cleanly or conflicts, and which open PRs it conflicts with",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "write the review body to <workspace>/draft.md in the voice of the posted review, and any inline comments with path, line and side",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "present the draft to the user in plain language, with the verdict, and ask whether to post it and as which kind of review",
+          "done": false,
+          "mandatory": true
+        }
+      ]
+    },
+    "8": {
+      "name": "Post",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "wait for the user's explicit OK for this review, and record their words in state.user_approval; an OK given for another PR does not count",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "re-fetch the PR right before posting: head SHA, state, merged; if the head moved, review the new commits (three-dot from head_sha_reviewed) and update the draft first; if it was merged or closed, ask before posting",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "post with gh api --method POST repos/<owner>/<repo>/pulls/<n>/reviews: commit_id = head_sha_reviewed, the agreed event, the body from draft.md, and inline comments only as agreed",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "verify the review exists with the right state and URL, and that each inline comment is anchored to its line; record posted_review_url",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "with --no-post, or when the user declines, skip posting and leave draft.md for the user",
+          "done": false
+        }
+      ]
+    },
+    "9": {
+      "name": "Close Out",
+      "status": "pending",
+      "verdict": null,
+      "checklist": [
+        {
+          "action": "tell the user the outcome in a few lines: the verdict, the link, whether their review unblocks the merge, and what still blocks it",
+          "done": false,
+          "mandatory": true
+        },
+        {
+          "action": "list the follow-ups the review promised (merge order, updates to make after a merge) and offer them",
+          "done": false
+        },
+        {
+          "action": "set completed_at and review_verdict, keep the workspace for --resume, and say where it is",
+          "done": false,
+          "mandatory": true
+        }
+      ]
+    }
+  }
+}

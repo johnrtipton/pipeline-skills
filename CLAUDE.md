@@ -31,6 +31,7 @@ extracts verdict from output → updates state file → repeats for next stage
 - `skills/pipeline-next/SKILL.md` — Task picker: parses ROADMAP.md, filters by milestone/priority, groups related tasks
 - `skills/pipeline-run/SKILL.md` — Stage executor: reads state file, spawns agents per stage, updates state
 - `skills/pipeline-ship/SKILL.md` — Ships existing working tree changes through quality gates to merged PR
+- `skills/pipeline-review/SKILL.md` — Reviews someone else's PR from its URL in its own workspace (`~/.pipeline-reviews/`): verifies the description's claims at their source, checks consumers, decision records, neighbour PRs, CI and branch rules, drafts a review and posts it only on the user's OK. State template `templates/review-state.json` (skill mode only; `pipeline.py` has no `review` type yet)
 - `skills/pipeline-strategy/SKILL.md` — Plans the next milestone via state-file-driven 8-stage session: survey → brainstorm → triage → cluster → present-paths (≥2) → recommend → decide → capture (ROADMAP/ADR/next-step)
 - `skills/pipeline-cycle/SKILL.md` — The outer loop: chains strategy → run --all → retro across milestones to a clean terminal state. Semi-autonomous by default (pauses at each strategy decision per ADR-0003); `--auto` for full hands-off. The orchestrator the human used to be
 
