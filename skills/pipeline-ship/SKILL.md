@@ -19,7 +19,7 @@ Use this when you've been coding interactively and want to formalize, review, an
 /pipeline-ship                          # Ship all uncommitted changes
 /pipeline-ship --description "..."      # Provide a description for the PR
 /pipeline-ship --branch feat/my-thing   # Use a specific branch name
-/pipeline-ship --no-merge               # Stop after PR creation (skip merge)
+/pipeline-ship --no-merge               # Review and retro, but skip the merge
 /pipeline-ship --resume                 # Resume an interrupted ship pipeline
 ```
 
@@ -28,7 +28,7 @@ Use this when you've been coding interactively and want to formalize, review, an
 - `--description "text"` — Task description for the PR and state file. If omitted, auto-generate from the diff.
 - `--branch name` — Branch name. If omitted, derive from the current branch or auto-generate from the description.
 - `--target branch` — PR target branch (default: `main`).
-- `--no-merge` — Create the PR but do not merge. Stops after Code Review. The state file marks stages 9 (Merge PR) and 10 (Retrospective) `skipped`.
+- `--no-merge` — Create the PR but do not merge. The state file marks stage 9 (Merge PR) `skipped`. Stage 10 (Retrospective) still runs after the Review Verdict and posts its PR comment, so an unmerged PR keeps the record of its run.
 - `--profile name` — Use this profile instead of the detected one (see Step 0.6).
 - `--resume` — Resume an interrupted pipeline from the last incomplete stage.
 
@@ -119,8 +119,8 @@ Use this when you've been coding interactively and want to formalize, review, an
    - **Fallback** (no `python3` or no `pipeline.py`): read the template from `templates/ship-state.json`
      in `$PIPELINE_DIR`. Project-local `.pipeline-templates/ship-state.json` overrides the default — see
      pipeline-next for the override convention. Fill in `task_description`, `branch_name`,
-     `pr_target_branch`, `project_path`, `started_at`; with `--no-merge`, set stages 9 and 10 to
-     `"status": "skipped"`. Write it to `.pipeline-state/<branch-name>.json`. No profile applies, so
+     `pr_target_branch`, `project_path`, `started_at`; with `--no-merge`, set stage 9 to
+     `"status": "skipped"` (stage 10 stays `pending`). Write it to `.pipeline-state/<branch-name>.json`. No profile applies, so
      say so.
    - Ignore `.pipeline-state/` where the profile's `scaffolding.ignore_file` says: `.gitignore` by
      default, or `.git/info/exclude` for a repo the team owns (the harness does this). Never edit
@@ -157,7 +157,7 @@ Stages 2-4 (Test, Self-Review, Security) can run in **parallel** since they're a
 
 Stages 2-4 are **skipped** if Inventory classified changes as `DOCS_ONLY`.
 
-If `--no-merge` is passed, stages 9 and 10 are skipped.
+If `--no-merge` is passed, stage 9 is skipped and stage 10 runs right after stage 8.
 
 ### Stage Details
 
@@ -195,17 +195,21 @@ REVIEW=$(gh pr view "$PR" --json comments,reviews -q '[.comments[].body, .review
 [ "$REVIEW" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Code Review artifact. Run Stage 7 before merge."; exit 1; }
 ```
 
-**Retrospective (Stage 10)** runs post-merge, so its gate is checked at the END
-of the pipeline: a per-PR retro comment must exist on the PR within the run. If
-absent, the pipeline is not complete — run Stage 10.
+**Retrospective (Stage 10)** runs post-merge (or right after Stage 8 with
+`--no-merge`), so its gate is checked at the END of the pipeline: a per-PR retro
+comment must exist on the PR within the run. If absent, the pipeline is not
+complete — run Stage 10. This holds for `--no-merge` runs too.
 
 ```bash
 RETRO=$(gh pr view "$PR" --json comments,reviews -q '[.comments[].body, .reviews[].body] | join("\n")' | grep -ic "retrospective\|RETRO_COMPLETE\|quality:")
 [ "$RETRO" -ge 1 ] || { echo "GATE FAIL: PR #$PR has no Retrospective artifact. Run Stage 10."; exit 1; }
 ```
 
-`--no-merge` runs skip Gate 1/2 (no merge happens) but should still reach
-Stage 7 — the whole point of `--no-merge` is to stop *after* Code Review.
+`--no-merge` runs skip Gate 1/2 (no merge happens) but still run Stage 7 and
+Stage 10: `--no-merge` skips only the merge, never the review or the retro.
+Observed cost: when `--no-merge` also skipped Stage 10, a draft PR finished its
+run with no retro anywhere, neither on the PR nor in `.pipeline-log.md`, and
+the Retrospective gate above could not pass.
 
 ### Resume
 
@@ -241,7 +245,7 @@ Auto-detected from the project (same as pipeline-shared):
 # Ship changes on an existing feature branch
 /pipeline-ship --branch feat/oauth2-auth
 
-# Just get it reviewed, don't merge yet
+# Get it reviewed and retro'd, don't merge yet
 /pipeline-ship --no-merge
 
 # Pick up where you left off after context compression

@@ -1,7 +1,7 @@
-.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns terminal-state
+.PHONY: check check-branch check-issues validate-templates validate-profiles check-profile-patterns check-no-merge terminal-state
 
 # Aggregate lightweight checks (no test suite — standalone stdlib script).
-check: check-branch validate-templates validate-profiles check-profile-patterns
+check: check-branch validate-templates validate-profiles check-profile-patterns check-no-merge
 
 # Guard against reintroduced hard-coded default-branch literals (#18).
 check-branch:
@@ -20,6 +20,10 @@ validate-profiles:
 # file, ahead of generic's (end to end through pipeline.py ship --init-only).
 check-profile-patterns:
 	@bash scripts/check-profile-patterns.sh
+
+# --no-merge skips the merge only; the Retrospective still runs and posts.
+check-no-merge:
+	@bash scripts/check-no-merge.sh
 
 # Pre-drain staleness check: verify cited symbols still exist (#7).
 # Usage: make check-issues ISSUES="7 6"

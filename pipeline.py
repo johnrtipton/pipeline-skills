@@ -430,8 +430,9 @@ def current_branch(project: str) -> str | None:
     return branch if r.returncode == 0 and branch and branch != "HEAD" else None
 
 
-# Stages that --no-merge skips: the merge, and the retrospective that follows it.
-NO_MERGE_STAGES = ("Merge PR", "Retrospective")
+# Stages that --no-merge skips: only the merge. The retrospective still runs and
+# posts its PR comment, so an unmerged PR keeps the record of its run.
+NO_MERGE_STAGES = ("Merge PR",)
 
 
 def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
@@ -441,8 +442,8 @@ def init_state(pipeline_type: str, task: str, project: str, target_branch: str,
     """Create a new state file from template, applying profile and project overrides.
 
     ``branch`` names the branch (a ship run keeps the branch its changes are on);
-    otherwise it is ``<prefix>/<slug of task>``. ``no_merge`` marks the merge and
-    retrospective stages skipped, so the run ends at the code review.
+    otherwise it is ``<prefix>/<slug of task>``. ``no_merge`` marks the merge stage
+    skipped, so the run goes from the review verdict to the retrospective.
     """
     project = os.path.abspath(project)
     state = load_template(pipeline_type, project)
@@ -1262,7 +1263,7 @@ Examples:
     parser.add_argument("--branch",
                         help="Branch name (ship default: the current branch, if not the target)")
     parser.add_argument("--no-merge", action="store_true",
-                        help="Skip the Merge PR and Retrospective stages (stop after code review)")
+                        help="Skip the Merge PR stage; the Retrospective still runs and posts")
     parser.add_argument("--init-only", action="store_true",
                         help="Write the state file, print its path and exit without running "
                              "stages (what /pipeline-ship uses to apply the profile)")

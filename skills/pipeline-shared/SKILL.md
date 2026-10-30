@@ -750,7 +750,7 @@ Approve and merge the pull request.
    - **Note on `gh pr checks` field names:** `gh pr checks --json` exposes status as `.state` (values: `SUCCESS`, `FAILURE`, `PENDING`), NOT `.conclusion`. Polling loops like `until [ "$(gh pr checks N --json conclusion ...)" != "" ]` will run forever silently because the field is always empty. Use `.state` for PR-level checks. (Distinct from `gh run view --json`, which DOES use `.conclusion`.)
 
 0.5. **Verify the PR is not still a draft**: Run `gh pr view <pr_number> --json isDraft -q .isDraft`. If `true`, `gh pr merge` will fail with `GraphQL: Pull Request is still a draft (mergePullRequest)`.
-   - If the PR is intentionally a draft (user wants `--no-merge` semantics), stop here.
+   - If the PR is intentionally a draft (user wants `--no-merge` semantics), skip the merge and go on to the Retrospective.
    - Otherwise, mark it ready: `gh pr ready <pr_number>`. Observed cost: max-companion PR #10 merge tripped on this; saved by manual `gh pr ready 10`. The skill catches it now so the merge step doesn't fail at the gate.
 
 1. Merge: `gh pr merge <pr-number> --squash --delete-branch`
@@ -769,7 +769,7 @@ Review the pipeline execution and provide feedback for continuous improvement.
 
 ### Steps
 
-1. Get PR details: `gh pr view <pr_number> --json commits,title,body,mergedAt` (the branch may have been deleted by squash merge — do NOT rely on `git log <target>..HEAD`)
+1. Get PR details: `gh pr view <pr_number> --json commits,title,body,state,mergedAt` (the branch may have been deleted by squash merge — do NOT rely on `git log <target>..HEAD`). A `--no-merge` run reaches this stage with the PR still open (`mergedAt` is null): say so in the retro, and rate the run up to the Review Verdict.
 2. Rate the execution quality (1-5)
 3. What went well?
 4. What could improve? (prompt quality, stage ordering, quality gates)
@@ -826,7 +826,7 @@ Append to `.pipeline-log.md` in the project root:
 ---
 ```
 
-This creates a running history of all pipeline executions on the project. Add `.pipeline-log.md` to `.gitignore`.
+This creates a running history of all pipeline executions on the project. Keep `.pipeline-log.md` git-ignored where the profile's `scaffolding.ignore_file` says: `.gitignore` by default, or the clone's `.git/info/exclude` for a repo the team owns. The harness adds it when it writes the state file, so never add it to a team repo's `.gitignore`.
 
 #### 2. GitHub PR Comment
 
