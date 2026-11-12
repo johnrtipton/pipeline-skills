@@ -196,4 +196,49 @@ if [r["round"] for r in state["rounds"]] != [1, 2] or state["post_mode"] != "ask
 print("✓ round 3 carries only the open findings, each with the round that raised it")
 PY
 
+# The workspace lock. A runner holds .pipeline-review.lock for its whole run: a write from
+# anyone else is refused with the owner's name and leaves the file as it was, and a write that
+# carries the run's token goes through and is recorded as the run's. Without a holder, a write
+# takes the lock for a moment and is recorded as interactive.
+TOKEN="check-token-0123456789"
+LOCK="$TMP/ws/.pipeline-review.lock"
+python3 - "$LOCK" "$TOKEN" "$TMP/held" "$TMP/release" <<'PY' &
+import fcntl, hashlib, json, os, sys, time
+lock, token, held, release = sys.argv[1:]
+with open(lock, "a+") as fh:
+    fcntl.flock(fh, fcntl.LOCK_EX)
+    fh.seek(0); fh.truncate()
+    fh.write(json.dumps({"owner": "Check Runner", "run": "run-7", "pid": os.getpid(),
+                         "started_at": "2026-11-12T10:00:00Z",
+                         "token_sha256": hashlib.sha256(token.encode()).hexdigest()}))
+    fh.flush()
+    open(held, "w").close()
+    while not os.path.exists(release):
+        time.sleep(0.05)
+PY
+holder=$!
+for _ in $(seq 1 100); do [ -e "$TMP/held" ] && break; sleep 0.05; done
+refuse "in use by Check Runner (run run-7" set "$STATE" note=interactive
+PIPELINE_REVIEW_LOCK_TOKEN=wrong-token refuse "in use by Check Runner" set "$STATE" note=wrong
+PIPELINE_REVIEW_LOCK_TOKEN="$TOKEN" run "" set "$STATE" note=from-the-run
+run "next:" status "$STATE"
+python3 - "$STATE" <<'PY' || fail=1
+import json, sys
+state = json.load(open(sys.argv[1]))
+if state.get("note") != "from-the-run" or state.get("last_write", {}).get("by") != "run":
+    print(f"✗ the run's own write was not recorded as the run's: {state.get('note')} {state.get('last_write')}")
+    sys.exit(1)
+print("✓ while a run holds the lock, only its token writes, and the write is the run's")
+PY
+touch "$TMP/release"; wait "$holder"
+run "" set "$STATE" note=after
+python3 - "$STATE" <<'PY' || fail=1
+import json, sys
+state = json.load(open(sys.argv[1]))
+if state.get("note") != "after" or state.get("last_write", {}).get("by") != "interactive":
+    print(f"✗ a write with no runner is not recorded as interactive: {state.get('last_write')}")
+    sys.exit(1)
+print("✓ after the run ends, a write takes the lock and is recorded as interactive")
+PY
+
 exit "$fail"

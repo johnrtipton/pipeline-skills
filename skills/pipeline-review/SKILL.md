@@ -235,6 +235,10 @@ as updating a PR of theirs after this one merges.
 - **One state file per workspace.** A later round of the same PR goes through `round`, never
   through a second state file elsewhere in `$WS`: `round` keeps the history where the script, and
   the next round, can read it.
+- **Another process may own the workspace.** An unattended runner holds `.pipeline-review.lock` in
+  `$WS` for its whole run, and `review_state.py` then refuses your writes and names the owner. Wait
+  for it to finish, or stop it, rather than working around it, and never delete the lock file.
+  The state's `last_write` says when it was last written and `by` whom: "run" or "interactive".
 - **Keep secrets out of the review.** Never paste tokens, keys or credential values into a review,
   even when the PR handles them. Name the secret, never its value.
 
