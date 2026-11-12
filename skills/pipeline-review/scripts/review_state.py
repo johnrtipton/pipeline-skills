@@ -28,13 +28,30 @@ rounds/<n>.json beside it and starts round n+1 from the template, with its re_re
 and previous_head, previous_review_url and previous_verdict from the finished round. The
 finished round's findings that are not RESOLVED or WITHDRAWN come along with recheck PENDING,
 and a stage marked recheck_findings (Verify Claims) cannot close while one is still PENDING.
+
+The workspace lock. A process that runs a whole review unattended (a runner, a scheduled job)
+holds an exclusive flock on .pipeline-review.lock beside the state file for the whole run, writes
+{"owner", "run", "pid", "started_at", "token_sha256"} into it, and gives the processes of its run
+the token in PIPELINE_REVIEW_LOCK_TOKEN. Every command that writes the state takes the same lock
+for the moment of its write, so two writers never interleave. While a run holds it, a write from
+anyone else is refused with the owner's name; a write that carries the run's token goes through.
+Each write records last_write: {"at", "by"}, where "by" is "run" for the holder's own processes
+and "interactive" otherwise, so a runner can leave alone a review that a person is working on.
 """
 
+import contextlib
 import datetime
+import fcntl
+import hashlib
 import json
 import os
 import sys
 import tempfile
+
+LOCK_NAME = ".pipeline-review.lock"
+TOKEN_ENV = "PIPELINE_REVIEW_LOCK_TOKEN"
+# Who is writing: set by the workspace lock before any write.
+_WRITER = "interactive"
 
 
 def _now() -> str:
@@ -49,8 +66,45 @@ def _load(path: str) -> dict:
         sys.exit(f"no state file at {path}; init starts a review")
 
 
+@contextlib.contextmanager
+def _workspace_lock(path: str):
+    """Hold the workspace lock for one write, or go through as the run that holds it."""
+    global _WRITER
+    folder = os.path.dirname(os.path.abspath(path))
+    os.makedirs(folder, exist_ok=True)
+    lock_path = os.path.join(folder, LOCK_NAME)
+    if os.path.islink(lock_path):
+        sys.exit(f"{lock_path} is a symlink; refusing to use it")
+    with open(lock_path, "a+") as fh:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            held = True
+        except BlockingIOError:
+            held = False
+        if held:
+            _WRITER = "interactive" if not os.environ.get(TOKEN_ENV) else "run"
+        else:
+            fh.seek(0)
+            try:
+                owner = json.loads(fh.read() or "{}")
+            except ValueError:
+                owner = {}
+            token = os.environ.get(TOKEN_ENV, "")
+            if not token or hashlib.sha256(token.encode()).hexdigest() != owner.get("token_sha256"):
+                sys.exit(f"this review is in use by {owner.get('owner') or 'another process'}"
+                         f" (run {owner.get('run') or '?'}, since {owner.get('started_at') or '?'});"
+                         " wait for it to finish, or stop it, before changing the state")
+            _WRITER = "run"
+        try:
+            yield
+        finally:
+            if held:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+
+
 def _save(path: str, state: dict) -> None:
     # Write to a temporary file in the same folder, then rename, so a crash never leaves half a file.
+    state["last_write"] = {"at": _now(), "by": _WRITER}
     folder = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(dir=folder, prefix=".state-", suffix=".json")
     with os.fdopen(fd, "w") as fh:
@@ -330,7 +384,13 @@ COMMANDS = {
     "update": cmd_update, "round": cmd_round,
 }
 
+READ_ONLY = {"status", "list"}
+
 if __name__ == "__main__":
     if len(sys.argv) < 3 or sys.argv[1] not in COMMANDS:
         sys.exit(__doc__)
-    COMMANDS[sys.argv[1]](sys.argv[2:])
+    if sys.argv[1] in READ_ONLY:
+        COMMANDS[sys.argv[1]](sys.argv[2:])
+    else:
+        with _workspace_lock(sys.argv[2]):
+            COMMANDS[sys.argv[1]](sys.argv[2:])

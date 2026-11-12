@@ -37,6 +37,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   fetches the PR head with `+`, so a force-pushed head updates `pr-<n>`. SKILL.md's
   Resume section and stages 1, 2, 4, 5 and 7 describe the round, and
   `scripts/check-review-state.sh` covers it and each refusal.
+- A workspace lock for `/pipeline-review`. A process that runs a whole review unattended holds
+  an exclusive flock on `.pipeline-review.lock` in the workspace, writes its owner, run, pid,
+  start time and a token's SHA-256 into it, and gives its processes the token in
+  `PIPELINE_REVIEW_LOCK_TOKEN`. Every `review_state.py` command that writes takes the lock for
+  the moment of its write, refuses while someone else's run holds it (naming the owner), and lets
+  the run's own processes through. Each write records `last_write` (`at`, and `by` "run" or
+  "interactive"), so a runner can leave alone a review that a person is working on.
+  `scripts/check-review-state.sh` covers the refusal, the token and both kinds of write.
 - Private profiles: `pipeline.py` searches `~/.config/pipeline-skills/profiles/`
   (or `PIPELINE_PROFILES_DIR`) before `profiles/`, so a profile that encodes a
   company's internal repos and process never ships in this public repo.
