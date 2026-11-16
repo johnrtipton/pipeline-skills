@@ -30,3 +30,4 @@ row here is a gate with no living pattern behind it.
 | `adjacent-evidence` | Before citing a file as evidence, confirm it describes the same app, environment, instance and version as the claim. | skill · `pipeline-review` Stage 4 | — |
 | `stale-pr-state` | Re-fetch a PR's head and merge state right before posting to it or reporting on it. | skill · `pipeline-review` Stage 8, rule | — |
 | `unresolved-thread-block` | Where the base branch requires resolved review threads, put non-blocking review comments in the review body, not in inline threads. | skill · `pipeline-review` Stage 6 | — |
+| `scope-beyond-request` | Trace a PR to the request that started it; list each grant of an access change with its reason from that request. | skill · `pipeline-review` Stages 3 and 5 | — |
