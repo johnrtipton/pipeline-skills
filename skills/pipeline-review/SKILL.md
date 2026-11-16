@@ -135,6 +135,12 @@ ready to find faults. Then list the claims. Most wrong merges come from one fals
 description ("the job already sets this", "nothing else loads these settings", "the default is
 unused"), not from a typo in the code.
 
+Find what the PR was asked to do: the ticket, the meeting note or the thread that started it. Note
+the request in its own words. A PR can be true to its own description and still do more than was
+asked: its code, tests, docs and description then agree with each other, and every claim checks out
+(`scope-beyond-request`). When nothing names the request, ask the user what it was before you judge
+the design.
+
 **4. Verify Claims.** Check each claim where it lives: the file and line at the PR head, the
 upstream source at the exact version the PR pins, the other repo's default branch, or a read-only
 API call. Write the evidence down as you go (`unverified-claim`).
@@ -167,7 +173,15 @@ repos, generated clients, and the order things deploy in. Compare the PR with th
 records and docs on the base branch, and with itself: its code, tests, docs and description should
 tell one story, and a PR that contradicts an accepted decision needs either a code change or a
 decision change. Test-merge the other open PRs that touch the same files, so the author learns the
-merge order now and not at the merge. Apply the review categories of `pipeline-shared` (Code
+merge order now and not at the merge. Compare the PR with the request from stage 3 too: what it adds
+that nobody asked for is a finding, even when it is consistent.
+
+For a change to who may do what (a new role, permission, scope, group or policy), list every grant
+it gives, one per line, and give each a reason from the request. A grant with no reason other than a
+convention ("every role holds X", "copied from the role next to it") is a Should, with least
+privilege as the fix. When the change makes a modelling choice, such as one job per role with roles
+that add up, or self-contained roles, name the choice and leave it to the people who own the model;
+do not settle it in a finding. Apply the review categories of `pipeline-shared` (Code
 Review): correctness, security, testing, quality, docs.
 
 **6. Repo Rules and CI.** Read CI on the reviewed head and the base branch's rules. Two of them

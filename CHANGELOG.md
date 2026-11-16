@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- `/pipeline-review` checks a PR against the request that started it, not only against itself.
+  Stage 3 finds the ticket, meeting note or thread and records the request in its own words.
+  Stage 5 flags what the PR adds beyond that request, and for a change to who may do what it
+  lists every grant with its reason: a grant that only a convention justifies is a Should, and a
+  role-modelling choice is named for its owners to decide. New pattern row:
+  `scope-beyond-request`.
 - `/pipeline-review`: reviews someone else's pull request from its URL, in its own workspace
   (`~/.pipeline-reviews/<owner>__<repo>__<n>/`) and driven by `templates/review-state.json`
   (9 stages). It checks the description's claims at their source, the change's consumers,
