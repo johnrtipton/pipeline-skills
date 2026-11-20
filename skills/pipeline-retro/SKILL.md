@@ -245,9 +245,15 @@ advance to stage 4. Fix one of three ways:
 
 1. **Convert to tracker_row** — file the action in stage 4, then return here
    and re-classify with the issue number.
-2. **Apply now** — commit a diff to a file other than RETRO.md (CLAUDE.md
-   addition, PR-checklist update, code change), then re-classify as `diff`
-   or `skill_update`.
+2. **Apply now** — commit a diff to a file other than RETRO.md (a canon
+   page, PR-checklist update, code change), then re-classify as `diff`
+   or `skill_update`. **Where a rule goes:** if the repo has
+   `docs/process-canon/`, write the arc's rules there as one page
+   (`docs/process-canon/<arc>.md`) and add a row to its `README.md`. Do not
+   append a section to `CLAUDE.md`: it is loaded into every session and every
+   stage agent, so each line there is paid for on every spawn. Add a line to
+   `CLAUDE.md` only for a rule every agent must apply on every task, one or two
+   lines with a link to the page.
 3. **Delete the finding** from RETRO.md if it isn't worth either. Milestone
    findings exist to drive change. Observations that don't drive change
    belong in **Insights**, not in **What We Learned**.

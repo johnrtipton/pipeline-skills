@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Token budget for stage agents. Templates mark mechanical stages (Environment Check, Change
+  Detection, Conflict Check, Review Verdict, Inventory Changes) `"run_as": "inline"`, so
+  `/pipeline-run` does them in the orchestrator with no spawn, and give read-mostly stages
+  `"model": "sonnet"`. `/pipeline-run` passes a stage's `model` to the Agent tool and briefs
+  agents for short reports; `pipeline.py` passes it as `--model` (claude backend only; an
+  explicit `--agent-model` wins) and caps inline stages at 15 turns. `/pipeline-retro` writes
+  new rules to `docs/process-canon/` when the repo has one, instead of appending to `CLAUDE.md`.
 - `/pipeline-review` checks a PR against the request that started it, not only against itself.
   Stage 3 finds the ticket, meeting note or thread and records the request in its own words.
   Stage 5 flags what the PR adds beyond that request, and for a change to who may do what it

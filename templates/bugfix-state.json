@@ -12,6 +12,8 @@
       "name": "Environment Check",
       "status": "pending",
       "verdict": null,
+      "run_as": "inline",
+      "model": "haiku",
       "checklist": [
         {
           "action": "git fetch origin",
@@ -44,6 +46,8 @@
       "name": "Conflict Check",
       "status": "pending",
       "verdict": null,
+      "run_as": "inline",
+      "model": "haiku",
       "checklist": [
         {
           "action": "git diff --check",
@@ -136,6 +140,7 @@
       "name": "Test Execution",
       "status": "pending",
       "verdict": null,
+      "model": "sonnet",
       "checklist": [
         {
           "action": "run full test suite (read-only, no source modifications)",
@@ -156,6 +161,7 @@
       "name": "Regression Check",
       "status": "pending",
       "verdict": null,
+      "model": "sonnet",
       "checklist": [
         {
           "action": "read .pipeline-state/<branch>-diagnosis.md for the original diagnosis",
@@ -189,6 +195,7 @@
       "name": "Documentation",
       "status": "pending",
       "verdict": null,
+      "model": "sonnet",
       "checklist": [
         {
           "action": "read .pipeline-state/<branch>-diagnosis.md to understand what was fixed",
@@ -230,6 +237,7 @@
       "name": "Commit & PR",
       "status": "pending",
       "verdict": null,
+      "model": "sonnet",
       "checklist": [
         {
           "action": "read .pipeline-state/<branch>-changes.txt for list of files modified by fix",
@@ -338,6 +346,8 @@
       "name": "Review Verdict",
       "status": "pending",
       "verdict": null,
+      "run_as": "inline",
+      "model": "haiku",
       "note": "Verdict is determined by the Code Review subagent above. If APPROVE, proceed to Merge. If REQUEST_CHANGES, fix issues, re-commit, re-push, re-run Code Review.",
       "checklist": [
         {
@@ -355,6 +365,7 @@
       "name": "Merge PR",
       "status": "pending",
       "verdict": null,
+      "model": "sonnet",
       "run_as": "subagent",
       "subagent_prompt": "Merge PR #{pr_number} in {project_path}. Step 0: Run 'gh pr checks {pr_number}' \u2014 verify CI green. If pre-existing failure, document with gh pr comment before merging. Step 1: Run gh pr merge {pr_number} --squash --delete-branch. Do NOT run gh pr review --approve (GitHub blocks self-approval). Output PR_MERGED or MERGE_FAILED.",
       "checklist": [
@@ -379,6 +390,7 @@
       "name": "Retrospective",
       "status": "pending",
       "verdict": null,
+      "model": "sonnet",
       "run_as": "subagent",
       "subagent_prompt": "Write retrospective for bug fix: {task_description}. Project: {project_path}. PR #{pr_number}. Run 'gh pr view {pr_number} --json commits,title,body' to get PR details (branch deleted after merge). Rate quality 1-5, what went well, lessons learned, improvements. Findings by pattern class (ADR-0004): list each review finding's [class: ...] tag as fired|missed; for any 'new', create docs/patterns/<class>.md from docs/patterns/TEMPLATE.md if the directory exists. MANDATORY: Post retro as gh pr comment {pr_number} --body '<formatted retro with quality, lessons, improvements>'. MANDATORY: Append to .pipeline-log.md (create if needed; the harness keeps it git-ignored, in .gitignore or in .git/info/exclude as the profile's scaffolding.ignore_file says, so never add it to .gitignore yourself). Your FINAL output line MUST be exactly 'RETRO_COMPLETE'.",
       "checklist": [
