@@ -91,7 +91,7 @@ Stages with `"run_as": "inline"` are mechanical (git, a diff, a verdict lookup):
 orchestrator runs them itself, with no agent spawn. Every spawned agent pays for
 the project's rule sheet, hooks and tool list before it starts, so a spawn has to
 buy fresh context or a different model.
-A stage's `"model"` (`haiku` / `sonnet` / `opus`) is the model to spawn it with
+A stage's `"model"` (`haiku` / `sonnet` / `opus` / `fable`) is the model to spawn it with
 (the Agent tool's `model` parameter; `--model` headless). No `model` means the
 session's default. An explicit `--agent-model` overrides every stage.
 Stages with `"skip_if": "DOCS_ONLY"` are skipped when Change Detection returned DOCS_ONLY.

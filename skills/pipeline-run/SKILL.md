@@ -702,8 +702,11 @@ model:
   Review Verdict, Inventory Changes): run the checklist yourself with Bash. Do not
   spawn. Keep command output short (`git status --short`, `--name-only`, `| tail`).
 - Otherwise spawn, passing the stage's `"model"` as the Agent tool's `model`
-  (`haiku` / `sonnet` / `opus`). No `model` means the default (use it for
-  Planning, Implementation and Code Review).
+  (`haiku` / `sonnet` / `opus` / `fable`). Planning, Diagnosis, Analysis and
+  every review stage (Self-Review, Security Check, Review, Code Review) are
+  `opus`; escalate one of them to `fable` when the change is security-class,
+  crosses the Python/Rust boundary, or an `opus` pass came back unsure or
+  split. Implementation has no `model` and uses the session default.
 - Brief the agent with the stage prompt only. Do not paste `CLAUDE.md`, the plan's
   whole history, or long files into the prompt: the agent can read what it needs.
 - Ask for a short report: the verdict string, then at most ~20 lines of findings.
