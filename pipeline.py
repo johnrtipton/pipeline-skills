@@ -667,6 +667,28 @@ def build_agent_cmd(agent: str, prompt: str, project: str, max_turns: int,
     )
 
 
+# A stage marked ``"run_as": "inline"`` is mechanical (git fetch, a diff, a
+# verdict lookup). In an interactive run the orchestrator does it itself with no
+# agent spawn; headless there is no orchestrator context, so it still runs as a
+# session, but with the stage's cheap model and a short turn budget.
+INLINE_MAX_TURNS = 15
+
+
+def stage_model(state: dict, stage: dict, agent: str) -> str | None:
+    """Pick the model for one stage.
+
+    An explicit ``--agent-model`` (``state["agent_model"]``) wins for every
+    stage. Otherwise a stage's ``model`` hint (``haiku`` / ``sonnet`` / ``opus``)
+    applies, but only on the ``claude`` backend, where those aliases are valid;
+    other backends get their own default.
+    """
+    if state.get("agent_model"):
+        return state["agent_model"]
+    if agent == "claude":
+        return stage.get("model")
+    return None
+
+
 def run_agent(prompt: str, project: str, agent: str = DEFAULT_AGENT,
               max_turns: int = 50, model: str | None = None) -> tuple[str, int]:
     """Run the configured agent backend with a prompt; return output + exit code."""
@@ -812,10 +834,12 @@ def run_pipeline(state: dict):
 
         # Build and run
         prompt = build_stage_prompt(state, stage_num, stage)
+        agent = state.get("agent", DEFAULT_AGENT)
         output, exit_code = run_agent(
             prompt, state["project_path"],
-            agent=state.get("agent", DEFAULT_AGENT),
-            model=state.get("agent_model"),
+            agent=agent,
+            model=stage_model(state, stage, agent),
+            max_turns=INLINE_MAX_TURNS if stage.get("run_as") == "inline" else 50,
         )
 
         # Extract verdict

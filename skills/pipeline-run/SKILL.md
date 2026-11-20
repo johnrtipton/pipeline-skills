@@ -691,7 +691,26 @@ If the stage has `"skip_if": "DOCS_ONLY"` and a previous stage's verdict was `DO
 
 If all stages are `passed` or `skipped`, the pipeline is complete — set `completed_at` and print the summary.
 
-### Step 3: Spawn an agent
+### Step 3: Spawn an agent (or don't)
+
+**Token budget.** Each agent starts by loading the project's `CLAUDE.md`, the
+session hooks' context and its tool list, often 10k-40k tokens before it reads a
+line of the task. Spawn only when the stage needs fresh context or a different
+model:
+
+- `"run_as": "inline"` (Environment Check, Change Detection, Conflict Check,
+  Review Verdict, Inventory Changes): run the checklist yourself with Bash. Do not
+  spawn. Keep command output short (`git status --short`, `--name-only`, `| tail`).
+- Otherwise spawn, passing the stage's `"model"` as the Agent tool's `model`
+  (`haiku` / `sonnet` / `opus` / `fable`). Planning, Diagnosis, Analysis and
+  every review stage (Self-Review, Security Check, Review, Code Review) are
+  `opus`; escalate one of them to `fable` when the change is security-class,
+  crosses the Python/Rust boundary, or an `opus` pass came back unsure or
+  split. Implementation has no `model` and uses the session default.
+- Brief the agent with the stage prompt only. Do not paste `CLAUDE.md`, the plan's
+  whole history, or long files into the prompt: the agent can read what it needs.
+- Ask for a short report: the verdict string, then at most ~20 lines of findings.
+  The orchestrator's context grows with every report it reads.
 
 Use the **Agent tool** with this pattern:
 
